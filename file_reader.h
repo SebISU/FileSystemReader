@@ -94,6 +94,7 @@ struct disk_t{
 
 struct volume_t{    // can reduce the struct size
 
+    struct disk_t * disk;
     uint32_t bytes_per_sector;
     uint32_t boot_size;
     uint32_t fat_size;
@@ -110,7 +111,12 @@ struct volume_t{    // can reduce the struct size
 
 struct file_t{
 
-    int x;
+    struct volume_t * volumin;
+    uint32_t offset;
+    uint32_t size;
+    uint16_t first_cluster; // add actual cluster?
+    uint8_t name[13];
+    union file_attrs file_attributes;
 
 };
 

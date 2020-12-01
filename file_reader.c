@@ -6,6 +6,10 @@
 #include <string.h>
 #include <time.h>
 #include "file_reader.h"
+#define UNALLOCATED 0x00
+#define DELETED 0xe5
+#define FILE_NAME 8
+#define FILE_EXT 3
 #define SECTOR_SIZE 512
 #define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, task author suggests 0x55AA BIG vs. LITTLE endian?
 #define LAST_CLUSTER(index) (index ^ 0xffff) // looking for the file's last cluster index, fix this
@@ -55,6 +59,7 @@ int disk_read(struct disk_t* pdisk, int32_t first_sector, void* buffer, int32_t 
         return -1;
     }
 
+    fseek(pdisk->file, first_sector * SECTOR_SIZE, SEEK_SET);
     fread(buffer, SECTOR_SIZE, sectors_to_read, pdisk->file);
 
     return sectors_to_read;
@@ -272,7 +277,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
             }
             else if (i % 3 == 1){
 
-                *(volumin->clusters_indexes + i) = 0xffff; //maybe better is 0?
+                *(volumin->clusters_indexes + i) = 0xffff; //maybe 0 is better?
             }
             else{
 
@@ -289,6 +294,8 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
             *(volumin->clusters_indexes + i/2) = *((uint16_t*)(fats_data + i));
         }
     }
+
+    volumin->disk = pdisk;
 
     free(fats_data);
     free(boot_sec);
@@ -312,13 +319,106 @@ int fat_close(struct volume_t* pvolume){
 
 struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
+    if (pvolume == NULL || file_name == NULL){
 
-    return 0;
+        errno = EFAULT;
+        return NULL;
+    }
+
+    struct SFN * root_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
+
+    if (root_dir == NULL){
+
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, root_dir, pvolume->root_dir_size)){
+
+        free(root_dir);
+        return NULL;
+    }
+
+    struct file_t * file = calloc(1, sizeof(struct file_t));
+
+    if (file == NULL){
+
+        free(root_dir);
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    for (int32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
+
+        if (*((uint8_t*)(root_dir + i)) == UNALLOCATED || *((uint8_t*)(root_dir + i)) == DELETED){
+            continue;
+        }
+
+        int32_t j;
+        for (j = 0; j < FILE_NAME; j++){
+
+            if ((root_dir + i)->filename[j] == ' '){
+                break;
+            }
+            
+            file->name[j] = (root_dir + i)->filename[j];
+        }
+
+        file->name[j] = '.';
+
+        int32_t k;
+        for (k = 0; k < FILE_EXT; k++){
+
+            if ((root_dir + i)->ext[k] == ' '){
+                break;
+            }
+            
+            file->name[j + 1 + k] = (root_dir + i)->ext[k];
+        }
+
+        file->name[j + 1 + k] = '\0';
+
+        if (0 == strcmp(file_name, file->name)){
+
+            if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
+
+                free(root_dir);
+                free(file);
+                errno = EISDIR;
+                return NULL;
+            }
+
+            file->volumin = pvolume;
+            file->offset = 0;
+            file->size = (root_dir + i)->size;
+            file->file_attributes.file_attributes = (root_dir + i)->file_attributes.file_attributes;
+            uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;   // brackets?
+            cluster |= (root_dir + i)->low_order_address_of_first_cluster;
+            file->first_cluster = cluster;
+
+            free(root_dir);
+            return file;
+        }
+        else{
+            continue;
+        }
+    }
+
+    free(root_dir);
+    free(file);
+    errno = ENOENT;
+    return NULL;
 }
 
 int file_close(struct file_t* stream){
 
+    if (stream == NULL){
 
+        errno = EFAULT;
+        return -1;
+    }
+
+    free(stream);
     return 0;
 }
 
@@ -330,8 +430,45 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
 int32_t file_seek(struct file_t* stream, int32_t offset, int whence){
 
+    if (stream == NULL){
 
-    return 0;
+        errno = EFAULT;
+        return -1;
+    }
+    else if (whence < 0 || 2 < whence){
+
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (whence == 0 && (offset < 0 || offset > stream->size)){
+
+        errno = ENXIO;
+        return -1;
+    }
+    else{
+        stream->offset = offset;
+    }
+
+    if (whence == 1 && (stream->offset + offset > stream->size || stream->offset + offset < 0)){
+
+        errno = ENXIO;
+        return -1;
+    }
+    else{
+        stream->offset = stream->offset + offset;
+    }
+
+    if (whence == 2 && (offset > 0 || stream->offset + offset < 0)){
+
+        errno = ENXIO;
+        return -1;
+    }
+    else{
+        stream->offset = stream->offset + offset;
+    }
+
+    return (int32_t)stream->offset;
 }
 
 struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
