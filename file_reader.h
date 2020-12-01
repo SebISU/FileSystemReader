@@ -115,6 +115,7 @@ struct file_t{
     uint32_t offset;
     uint32_t size;
     uint16_t first_cluster; // add actual cluster?
+    uint16_t actual_cluster;
     uint8_t name[13];
     union file_attrs file_attributes;
 

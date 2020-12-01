@@ -395,6 +395,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
             uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;   // brackets?
             cluster |= (root_dir + i)->low_order_address_of_first_cluster;
             file->first_cluster = cluster;
+            file->actual_cluster = cluster;
 
             free(root_dir);
             return file;
@@ -423,6 +424,15 @@ int file_close(struct file_t* stream){
 }
 
 size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
+
+    if (ptr == NULL || stream == NULL){
+
+        errno = EFAULT;
+        return -1;
+    }
+
+    // ENXIO -> klaster z poza woluminu
+
 
 
     return 0;
