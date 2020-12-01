@@ -28,7 +28,7 @@ struct extended_BPB{
     uint8_t sign_to_validate_next;
     uint8_t vol_ser_num[4];
     uint8_t vol_label[11];
-    uint64_t file_sys_type_lev;
+    uint8_t file_sys_type[8];
     uint8_t not_used_2[448];
     uint16_t sign_value;
 } __attribute__((__packed__));
@@ -92,15 +92,20 @@ struct disk_t{
     uint32_t many_sectors;
 };
 
-struct volume_t{
+struct volume_t{    // can reduce the struct size
 
+    uint32_t bytes_per_sector;
+    uint32_t boot_size;
     uint32_t fat_size;
-    uint8_t many_fats;
+    uint32_t sects_per_fat;
+    uint32_t num_of_fats;
     uint32_t cluster_size;
     uint32_t num_of_files_root_dir;
     uint32_t root_dir_size;
+    uint32_t num_of_sectors;
+    uint32_t type;
     uint16_t * clusters_indexes;
-    //add some fields to simplify moving during reading files
+    
 };
 
 struct file_t{
