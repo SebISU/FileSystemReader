@@ -3,20 +3,20 @@
 # Tomasz Jaworski, 2018-2020
 #
 # Plik wygenerowany automatycznie
-# Znacznik czasowy: 2020-11-30 09:35:25.950881
+# Znacznik czasowy: 2020-12-02 11:34:19.713354
 #
 
 OUTDIR		:= build-dir
 
 CC          := gcc
-CC_FLAGS    := -Werror -Wno-error=implicit-fallthrough -fdiagnostics-color -ggdb3 -DINSIDE_DANTE -Wextra -Wall -Wno-error=parentheses -D_GNU_SOURCE -Wno-parentheses -pedantic -D_ANSI_OUTPUT -fmax-errors=5 -Werror=vla -std=c11 -xc -Wno-error=unused-parameter 
+CC_FLAGS    := -Werror -fdiagnostics-color -fmax-errors=5 -D_ANSI_OUTPUT -pedantic -Wall -std=c11 -xc -Wno-parentheses -D_GNU_SOURCE -Wno-error=parentheses -ggdb3 -Werror=vla -Wno-error=unused-parameter -Wno-error=implicit-fallthrough -Wextra -DINSIDE_DANTE 
 #CC_FLAGS    += -Werror=vla -Wno-error=unused-parameter -Wno-error=parentheses -Wno-parentheses -Wno-error=implicit-fallthrough
 #CC_FLAGS    += -D_GNU_SOURCE -D_TEST_BOOTSTRAP -DINSIDE_DANTE
 #CC_FLAGS    += -D_NO_HTML_OUTPUT -D_ANSI_OUTPUT
 
 LD          := gcc
-LD_FLAGS    := 
-LD_LIBS     := 
+LD_FLAGS    := -Wl,-cref -Wl,-Map=main.map -ggdb3 -Wl,-wrap,main 
+LD_LIBS     := -lm 
 
 RM          := rm -rf
 MKDIR       := mkdir -p
@@ -59,10 +59,18 @@ build: .prepare ${OUTDIR}/main
 # Kompilacja i konsolidacja przesłanego programu
 #
 
-${OUTDIR}/main: ${OUTDIR}/unit_helper_v2.c.o ${OUTDIR}/unit_test_v2.c.o ${OUTDIR}/rdebug.c.o 
+${OUTDIR}/main: ${OUTDIR}/file_reader.c.o ${OUTDIR}/main.c.o ${OUTDIR}/unit_helper_v2.c.o ${OUTDIR}/unit_test_v2.c.o ${OUTDIR}/rdebug.c.o 
 	@echo "Konsolidacja..."
-	@${LD} ${LD_FLAGS} ${OUTDIR}/unit_helper_v2.c.o ${OUTDIR}/unit_test_v2.c.o ${OUTDIR}/rdebug.c.o  -o ${OUTDIR}/main ${LD_LIBS}
+	@${LD} ${LD_FLAGS} ${OUTDIR}/file_reader.c.o ${OUTDIR}/main.c.o ${OUTDIR}/unit_helper_v2.c.o ${OUTDIR}/unit_test_v2.c.o ${OUTDIR}/rdebug.c.o  -o ${OUTDIR}/main ${LD_LIBS}
 
+
+${OUTDIR}/file_reader.c.o:  file_reader.c
+	@echo "Budowanie pliku 'file_reader.o' z 'file_reader.c'..."
+	${CC} ${CC_FLAGS} -c file_reader.c -o ${OUTDIR}/file_reader.c.o
+
+${OUTDIR}/main.c.o:  main.c
+	@echo "Budowanie pliku 'main.o' z 'main.c'..."
+	${CC} ${CC_FLAGS} -c main.c -o ${OUTDIR}/main.c.o
 
 ${OUTDIR}/unit_helper_v2.c.o:  unit_helper_v2.c
 	@echo "Budowanie pliku 'unit_helper_v2.o' z 'unit_helper_v2.c'..."

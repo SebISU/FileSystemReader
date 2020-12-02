@@ -12,8 +12,8 @@
 #define FILE_EXT 3
 #define SECTOR_SIZE 512
 #define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, task author suggests 0x55AA BIG vs. LITTLE endian?
-#define LAST_CLUSTER(index) (index ^ 0xffff) // looking for the file's last cluster index, fix this
-#define POWER_OF_TWO(x) (!(x & (x - 1)) && x)
+#define LAST_CLUSTER 0xffff       // (index) (index ^ 0xffff) looking for the file's last cluster index, fix this
+#define POWER_OF_TWO(x) ((x & (x - 1)) && x)
 #define MAX_CLUSTER_SIZE 64
 
 
@@ -25,7 +25,7 @@ struct disk_t* disk_open_from_file(const char* volume_file_name){
         return NULL;
     }
 
-    struct disk_t * disk = malloc(sizeof(struct disk_t));
+    struct disk_t * disk = calloc(1, sizeof(struct disk_t));
 
     if (disk == NULL){
 
@@ -35,6 +35,7 @@ struct disk_t* disk_open_from_file(const char* volume_file_name){
 
     if((disk->file = fopen(volume_file_name, "rb")) == NULL){
 
+        free(disk);
         errno = ENOENT;
         return NULL;
     }
@@ -88,26 +89,14 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
         return NULL;
     }
 
-    struct volume_t * volumin = malloc(sizeof(struct volume_t));
-    struct extended_BPB * boot_sec = malloc(sizeof(struct extended_BPB));
+    struct volume_t * volumin = calloc(1, sizeof(struct volume_t));
+    struct extended_BPB * boot_sec = calloc(1, sizeof(struct extended_BPB));
 
-    if (volumin == NULL){
+    if (volumin == NULL || boot_sec == NULL){
 
         free(boot_sec);
-        errno = ENOMEM;
-        return NULL;
-    }
-    else if(boot_sec == NULL){
-
         free(volumin);
         errno = ENOMEM;
-        return NULL;
-    }
-
-    if (-1 == disk_read(pdisk, first_sector, boot_sec, 1)){
-
-        free(volumin);
-        free(boot_sec);
         return NULL;
     }
 
@@ -154,11 +143,11 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
         return NULL;
     }
 
-    if (0 == strncmp(boot_sec->file_sys_type, "FAT12", 5)){
+    if (0 == strncmp((const char*)boot_sec->file_sys_type, "FAT12", 5)){
 
         volumin->type = 12;
     }
-    else if (0 == strncmp(boot_sec->file_sys_type, "FAT16", 5)){
+    else if (0 == strncmp((const char*)boot_sec->file_sys_type, "FAT16", 5)){
 
         volumin->type = 16;
     }
@@ -242,7 +231,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
         return NULL;
     }
 
-    for (int32_t i = 0; i < volumin->num_of_fats - 1; ++i){
+    for (uint32_t i = 0; i < volumin->num_of_fats - 1; ++i){
 
         if (0 != memcmp(fats_data + i * volumin->fat_size, fats_data + (i + 1) * volumin->fat_size, volumin->fat_size)){
 
@@ -267,7 +256,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
 
     if (volumin->type == 12){
 
-        for (int32_t i = 0; i < volumin->fat_size; ++i){
+        for (uint32_t i = 0; i < volumin->fat_size; ++i){
 
             if (i % 3 == 0){
 
@@ -289,13 +278,14 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
     }
     else{
 
-        for (int32_t i = 0; i < volumin->fat_size; i += 2){
+        for (uint32_t i = 0; i < volumin->fat_size; i += 2){
 
             *(volumin->clusters_indexes + i/2) = *((uint16_t*)(fats_data + i));
         }
     }
 
     volumin->disk = pdisk;
+    volumin->bef_data_size = volumin->boot_size + volumin->num_of_fats * volumin->sects_per_fat + volumin->root_dir_size;
 
     free(fats_data);
     free(boot_sec);
@@ -348,37 +338,39 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         return NULL;
     }
 
-    for (int32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
+    for (uint32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
 
         if (*((uint8_t*)(root_dir + i)) == UNALLOCATED || *((uint8_t*)(root_dir + i)) == DELETED){
             continue;
         }
 
-        int32_t j;
-        for (j = 0; j < FILE_NAME; j++){
+        convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
 
-            if ((root_dir + i)->filename[j] == ' '){
-                break;
-            }
+        // int32_t j;
+        // for (j = 0; j < FILE_NAME; j++){
+
+        //     if ((root_dir + i)->filename[j] == ' '){
+        //         break;
+        //     }
             
-            file->name[j] = (root_dir + i)->filename[j];
-        }
+        //     file->name[j] = (root_dir + i)->filename[j];
+        // }
 
-        file->name[j] = '.';
+        // file->name[j] = '.';
 
-        int32_t k;
-        for (k = 0; k < FILE_EXT; k++){
+        // int32_t k;
+        // for (k = 0; k < FILE_EXT; k++){
 
-            if ((root_dir + i)->ext[k] == ' '){
-                break;
-            }
+        //     if ((root_dir + i)->ext[k] == ' '){
+        //         break;
+        //     }
             
-            file->name[j + 1 + k] = (root_dir + i)->ext[k];
-        }
+        //     file->name[j + 1 + k] = (root_dir + i)->ext[k];
+        // }
 
-        file->name[j + 1 + k] = '\0';
+        // file->name[j + 1 + k] = '\0';
 
-        if (0 == strcmp(file_name, file->name)){
+        if (0 == strcmp(file_name, (const char*)file->name)){
 
             if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
 
@@ -411,6 +403,39 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
     return NULL;
 }
 
+int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name){
+
+    if (filename == NULL || ext == NULL || name == NULL){
+        return -1;
+    }
+
+        int32_t j;
+        for (j = 0; j < FILE_NAME; j++){
+
+            if (filename[j] == ' '){
+                break;
+            }
+            
+            name[j] = filename[j];
+        }
+
+        name[j] = '.';
+
+        int32_t k;
+        for (k = 0; k < FILE_EXT; k++){
+
+            if (ext[k] == ' '){
+                break;
+            }
+            
+            name[j + 1 + k] = ext[k];
+        }
+
+        name[j + 1 + k] = '\0';
+
+        return 0;
+}
+
 int file_close(struct file_t* stream){
 
     if (stream == NULL){
@@ -431,9 +456,72 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
         return -1;
     }
 
-    // ENXIO -> klaster z poza woluminu
+    if (stream->offset == stream->size){
 
+        return 0;
+    }
 
+    uint8_t * sector_data = calloc(1, stream->volumin->bytes_per_sector);
+
+    if (sector_data == NULL){
+
+        errno = EFAULT; // should be ENOMEM but in the task description there is no such option
+        return -1;
+    }
+
+    size_t loaded_memb = 0;
+    size_t size_to_read = size * nmemb;
+    size_t rem_size_to_read = size * nmemb;
+    uint32_t intern_offset, avail_bytes_sector;
+
+    do{
+
+        if (stream->actual_cluster - 2u >= stream->volumin->num_of_sectors - stream->volumin->bef_data_size){
+
+            free(sector_data);
+            errno = ENXIO;
+            return -1;
+        }
+
+        if (-1 == disk_read(stream->volumin->disk, stream->volumin->bef_data_size + stream->actual_cluster - 2, sector_data, 1)){
+
+            free(sector_data);
+            return -1;
+        }
+
+        intern_offset = stream->offset % stream->volumin->bytes_per_sector;
+        avail_bytes_sector = stream->volumin->bytes_per_sector - intern_offset;
+
+        if (rem_size_to_read <= avail_bytes_sector){
+
+            memcpy(sector_data + intern_offset, (uint8_t*)ptr + size_to_read - rem_size_to_read, rem_size_to_read);
+            loaded_memb = size_to_read / size;
+            stream->offset += rem_size_to_read;
+            break;
+        }
+        
+        memcpy(sector_data + intern_offset, (uint8_t*)ptr + size_to_read - rem_size_to_read, avail_bytes_sector);
+        rem_size_to_read -= avail_bytes_sector;
+        loaded_memb = (size_to_read - rem_size_to_read) / size;
+        stream->offset += avail_bytes_sector;
+
+        stream->actual_cluster = stream->volumin->clusters_indexes[stream->actual_cluster - 1];
+
+    }while(stream->actual_cluster != LAST_CLUSTER);
+
+    free(sector_data);
+
+    // should I return a number of bytes when I can not read even 1 memb of data but I read a few bytes?
+
+    if (loaded_memb > 0){
+
+        if (nmemb > 1){
+            return loaded_memb;
+        }
+        else{
+            return size;
+        }
+    }
 
     return 0;
 }
@@ -451,25 +539,16 @@ int32_t file_seek(struct file_t* stream, int32_t offset, int whence){
         return -1;
     }
 
-    if (whence == 0 && (offset < 0 || offset > stream->size)){
+    if (whence == 0 && (offset < 0 || offset > (int32_t)stream->size)){
 
         errno = ENXIO;
         return -1;
     }
     else{
-        stream->offset = offset;
+        stream->offset = (uint32_t)offset;
     }
 
-    if (whence == 1 && (stream->offset + offset > stream->size || stream->offset + offset < 0)){
-
-        errno = ENXIO;
-        return -1;
-    }
-    else{
-        stream->offset = stream->offset + offset;
-    }
-
-    if (whence == 2 && (offset > 0 || stream->offset + offset < 0)){
+    if (whence == 1 && ((int32_t)stream->offset + offset > (int32_t)stream->size || (int32_t)stream->offset + offset < 0)){
 
         errno = ENXIO;
         return -1;
@@ -478,23 +557,109 @@ int32_t file_seek(struct file_t* stream, int32_t offset, int whence){
         stream->offset = stream->offset + offset;
     }
 
-    return (int32_t)stream->offset;
+    if (whence == 2 && (offset > 0 || (int32_t)stream->offset + offset < 0)){
+
+        errno = ENXIO;
+        return -1;
+    }
+    else{
+        stream->offset = stream->offset + offset;
+    }
+
+    return stream->offset;
 }
+
+// for extended paths use strtok()
 
 struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
+    if (pvolume == NULL || dir_path == NULL){
 
-    return 0;
+        errno = EFAULT;
+        return NULL;
+    }
+
+    if (strcmp("\\", dir_path) != 0){
+
+        errno = ENOENT;
+        return NULL;
+    }
+
+    struct dir_t * dir = calloc(1, sizeof(struct dir_t));
+
+    if (dir == NULL){
+
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    dir->current_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
+
+    if (dir->current_dir == NULL){
+
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, dir->current_dir, pvolume->root_dir_size)){
+
+        free(dir->current_dir);
+        free(dir);
+        return NULL;
+    }
+
+    dir->num_of_records = pvolume->num_of_files_root_dir;
+    dir->index_record = 0;
+
+    return dir;
 }
 
 int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
 
+    if (pdir == NULL || pentry == NULL){
 
-    return 0;
+        errno = EFAULT;
+        return -1;
+    }
+    else if(pdir->current_dir == NULL){
+
+        errno = EIO;
+        return -1;
+    }
+    else if (pdir->index_record > pdir->num_of_records){
+
+        errno = ENXIO;
+        return -1;
+    }
+
+    for (; pdir->index_record < pdir->num_of_records; pdir->index_record++){
+
+        if (*((uint8_t*)(pdir->current_dir + pdir->index_record)) != UNALLOCATED && *((uint8_t*)(pdir->current_dir + pdir->index_record)) != DELETED && !(pdir->current_dir + pdir->index_record)->file_attributes.volume_label){
+            
+            convert_record_name((pdir->current_dir + pdir->index_record)->filename, (pdir->current_dir + pdir->index_record)->ext, pentry->name);
+            pentry->size = (pdir->current_dir + pdir->index_record)->size;
+            pentry->is_archived = (pdir->current_dir + pdir->index_record)->file_attributes.archive;
+            pentry->is_readonly = (pdir->current_dir + pdir->index_record)->file_attributes.read_only;
+            pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
+            pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
+            pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
+
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 int dir_close(struct dir_t* pdir){
 
+    if (pdir == NULL){
 
+        errno = EFAULT;
+        return -1;
+    }
+
+    free(pdir->current_dir);
+    free(pdir);
     return 0;
 }

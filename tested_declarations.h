@@ -1,7 +1,7 @@
 /*
  * Test dla zadania Projekt: czytnik dysku, woluminu, katalogu głównego i plików (3,0)
  * Autor testowanej odpowiedzi: Sebastian Derendarz
- * Test wygenerowano automatycznie o 2020-11-30 09:35:22.243519
+ * Test wygenerowano automatycznie o 2020-12-02 11:34:12.781008
  *
  * Debug: { { test|pprint } }
  */

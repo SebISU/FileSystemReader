@@ -1,6 +1,7 @@
 #ifndef F_READER_H
 #define F_READER_H
 
+#include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -72,8 +73,8 @@ union file_attrs{
 };
 
 struct SFN{
-    char filename[8];
-    char ext[3];
+    uint8_t filename[8];
+    uint8_t ext[3];
     union file_attrs file_attributes;
     uint8_t reserved;
     uint8_t file_creation_time;
@@ -103,6 +104,7 @@ struct volume_t{    // can reduce the struct size
     uint32_t cluster_size;
     uint32_t num_of_files_root_dir;
     uint32_t root_dir_size;
+    uint32_t bef_data_size;
     uint32_t num_of_sectors;
     uint32_t type;
     uint16_t * clusters_indexes;
@@ -116,20 +118,28 @@ struct file_t{
     uint32_t size;
     uint16_t first_cluster; // add actual cluster?
     uint16_t actual_cluster;
-    uint8_t name[13];
+    char name[13];
     union file_attrs file_attributes;
 
 };
 
 struct dir_t{
 
-    int x;
+    struct SFN * current_dir;
+    uint32_t num_of_records;
+    uint32_t index_record;
 
 };
 
 struct dir_entry_t{
 
-    int name;
+    uint32_t size;
+    char name[13];
+    uint8_t is_archived : 1;
+    uint8_t is_readonly : 1;
+    uint8_t is_system : 1;
+    uint8_t is_hidden : 1;
+    uint8_t is_directory : 1;
 
 };
 
@@ -145,6 +155,7 @@ int32_t file_seek(struct file_t* stream, int32_t offset, int whence);
 struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path);
 int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry);
 int dir_close(struct dir_t* pdir);
+int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name);
 
 
 #endif

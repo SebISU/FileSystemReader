@@ -87,7 +87,7 @@ void test_summary(int expected_positives);
 //
 
 // Zwróc pozycję pierwszej różnicy między danymi pods wskaźnkami ptr1 i ptr2. Funkcja sprawdza size bajtów.
-int mem_find_first_difference(const void* ptr1, const void* ptr2, size_t size);
+int mem_find_first_difference(const void* ptr1, const void* ptr2, ssize_t size);
 
 // Pobierz bajt z pozycji pos bufora danego wskaźnikiem ptr.
 unsigned char mem_get_byte(const void* ptr, int pos);
