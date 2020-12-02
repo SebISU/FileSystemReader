@@ -43,7 +43,7 @@ union mod_cr_time{
         uint16_t min : 6;
         uint16_t hour : 5;
     };
-};
+} __attribute__((__packed__));
 
 union mod_cr_date{
 
@@ -54,7 +54,7 @@ union mod_cr_date{
         uint16_t month : 4;
         uint16_t year : 7;
     };
-};
+} __attribute__((__packed__));
 
 union file_attrs{
 
@@ -70,7 +70,7 @@ union file_attrs{
         uint8_t bit7 : 1;
         uint8_t bit8 : 1;
     };
-};
+} __attribute__((__packed__));
 
 struct SFN{
     uint8_t filename[8];
@@ -91,45 +91,44 @@ struct SFN{
 struct disk_t{
     FILE * file;
     uint32_t many_sectors;
-};
+} __attribute__((__packed__));
 
-struct volume_t{    // can reduce the struct size
+struct volume_t{
 
     struct disk_t * disk;
-    uint32_t bytes_per_sector;
-    uint32_t boot_size;
+    uint16_t bytes_per_sector;
+    uint16_t boot_size;
     uint32_t fat_size;
-    uint32_t sects_per_fat;
-    uint32_t num_of_fats;
-    uint32_t cluster_size;
-    uint32_t num_of_files_root_dir;
-    uint32_t root_dir_size;
-    uint32_t bef_data_size;
+    uint8_t sects_per_fat;
+    uint8_t num_of_fats;
+    uint8_t cluster_size;
+    uint16_t num_of_files_root_dir;
+    uint16_t root_dir_size;
+    uint16_t bef_data_size;
     uint32_t num_of_sectors;
-    uint32_t type;
+    uint8_t type;
     uint16_t * clusters_indexes;
     
-};
+} __attribute__((__packed__));
 
 struct file_t{
 
     struct volume_t * volumin;
     uint32_t offset;
     uint32_t size;
-    uint16_t first_cluster; // add actual cluster?
+    uint16_t first_cluster;
     uint16_t actual_cluster;
-    char name[13];
-    union file_attrs file_attributes;
+    char name[13];  // could be uint8_t* but small problem with using strcmp() :)
 
-};
+} __attribute__((__packed__));
 
 struct dir_t{
 
     struct SFN * current_dir;
-    uint32_t num_of_records;
-    uint32_t index_record;
+    uint16_t num_of_records;
+    uint16_t index_record;
 
-};
+} __attribute__((__packed__));
 
 struct dir_entry_t{
 
@@ -141,7 +140,7 @@ struct dir_entry_t{
     uint8_t is_hidden : 1;
     uint8_t is_directory : 1;
 
-};
+} __attribute__((__packed__));
 
 struct disk_t* disk_open_from_file(const char* volume_file_name);
 int disk_read(struct disk_t* pdisk, int32_t first_sector, void* buffer, int32_t sectors_to_read);

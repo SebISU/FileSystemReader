@@ -231,7 +231,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
         return NULL;
     }
 
-    for (uint32_t i = 0; i < volumin->num_of_fats - 1; ++i){
+    for (uint32_t i = 0; i < volumin->num_of_fats - 1u; ++i){
 
         if (0 != memcmp(fats_data + i * volumin->fat_size, fats_data + (i + 1) * volumin->fat_size, volumin->fat_size)){
 
@@ -372,7 +372,6 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
             file->volumin = pvolume;
             file->offset = 0;
             file->size = (root_dir + i)->size;
-            file->file_attributes.file_attributes = (root_dir + i)->file_attributes.file_attributes;
             uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;
             cluster |= (root_dir + i)->low_order_address_of_first_cluster;
             file->first_cluster = cluster;
@@ -444,13 +443,13 @@ int file_close(struct file_t* stream){
 
 size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
-    if (ptr == NULL || stream == NULL){
+    if (stream == NULL){
 
         errno = EFAULT;
         return -1;
     }
 
-    if (stream->offset == stream->size){
+    if (stream->offset == stream->size || ptr == NULL){
 
         return 0;
     }
@@ -478,7 +477,7 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
     do{
 
-        if ((stream->actual_cluster - 2) * stream->volumin->cluster_size >= stream->volumin->num_of_sectors - stream->volumin->bef_data_size){
+        if ((stream->actual_cluster - 2u) * stream->volumin->cluster_size >= stream->volumin->num_of_sectors - stream->volumin->bef_data_size){
             free(cluster_data);
             errno = ENXIO;
             return -1;
@@ -659,6 +658,7 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
             pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
             pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
             pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
+            pdir->index_record++;
 
             return 0;
         }
