@@ -11,8 +11,8 @@
 #define FILE_NAME 8
 #define FILE_EXT 3
 #define SECTOR_SIZE 512
-#define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, task author suggests 0x55AA BIG vs. LITTLE endian?
-#define LAST_CLUSTER 0xffff       // (index) (index ^ 0xffff) looking for the file's last cluster index, fix this
+#define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, author of the task suggests 0x55AA BIG vs. LITTLE endian?
+#define LAST_CLUSTER 0xffff
 #define POWER_OF_TWO(x) ((x & (x - 1)) && x)
 #define MAX_CLUSTER_SIZE 64
 
@@ -42,7 +42,7 @@ struct disk_t* disk_open_from_file(const char* volume_file_name){
 
     fseek(disk->file, 0, SEEK_END);
 
-    disk->many_sectors = ftell(disk->file) / SECTOR_SIZE;   // what if will be 0?
+    disk->many_sectors = ftell(disk->file) / SECTOR_SIZE;
 
     return disk;
 }
@@ -243,7 +243,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
         }
     }
 
-    volumin->clusters_indexes = calloc(volumin->fat_size, sizeof(uint16_t));
+    volumin->clusters_indexes = calloc(volumin->fat_size / 3 * 2 + 1, sizeof(uint16_t));
 
     if (volumin->clusters_indexes == NULL){
 
@@ -256,23 +256,36 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
 
     if (volumin->type == 12){
 
+        uint32_t index = 0;
+        uint16_t value;
         for (uint32_t i = 0; i < volumin->fat_size; ++i){
 
             if (i % 3 == 0){
 
-                uint16_t value = *(fats_data + i + 1) & 0x0f;
+                value = *(fats_data + i + 1) & 0x0f;
                 value <<= 8;
-                *(volumin->clusters_indexes + i) = value | *(fats_data + i);
-            }
-            else if (i % 3 == 1){
+                value |= *(fats_data + i);
 
-                *(volumin->clusters_indexes + i) = 0xffff; //maybe 0 is better?
+                if (value == 0x0fff){
+                    *(volumin->clusters_indexes + index) = LAST_CLUSTER;
+                }
+                else{
+                    *(volumin->clusters_indexes + index) = value;
+                }
+                index++;
             }
-            else{
+            else if (i % 3 == 2){
 
-                uint16_t value = *(fats_data + i);
-                value <<= 4;
-                *(volumin->clusters_indexes + i) = value | (*(fats_data + i - 1) >> 4);
+                value = *(fats_data + i) << 4;
+                value |= (*(fats_data + i - 1) >> 4);
+
+                if (value == 0x0fff){
+                    *(volumin->clusters_indexes + index) = LAST_CLUSTER;
+                }
+                else{
+                    *(volumin->clusters_indexes + index) = value;
+                }
+                index++;
             }
         }
     }
@@ -323,7 +336,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         return NULL;
     }
 
-    if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, root_dir, pvolume->root_dir_size)){
+    if (-1 == disk_read(pvolume->disk, pvolume->bef_data_size - pvolume->root_dir_size, root_dir, pvolume->root_dir_size)){
 
         free(root_dir);
         return NULL;
@@ -346,30 +359,6 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
         convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
 
-        // int32_t j;
-        // for (j = 0; j < FILE_NAME; j++){
-
-        //     if ((root_dir + i)->filename[j] == ' '){
-        //         break;
-        //     }
-            
-        //     file->name[j] = (root_dir + i)->filename[j];
-        // }
-
-        // file->name[j] = '.';
-
-        // int32_t k;
-        // for (k = 0; k < FILE_EXT; k++){
-
-        //     if ((root_dir + i)->ext[k] == ' '){
-        //         break;
-        //     }
-            
-        //     file->name[j + 1 + k] = (root_dir + i)->ext[k];
-        // }
-
-        // file->name[j + 1 + k] = '\0';
-
         if (0 == strcmp(file_name, (const char*)file->name)){
 
             if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
@@ -384,7 +373,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
             file->offset = 0;
             file->size = (root_dir + i)->size;
             file->file_attributes.file_attributes = (root_dir + i)->file_attributes.file_attributes;
-            uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;   // brackets?
+            uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;
             cluster |= (root_dir + i)->low_order_address_of_first_cluster;
             file->first_cluster = cluster;
             file->actual_cluster = cluster;
@@ -431,7 +420,12 @@ int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * na
             name[j + 1 + k] = ext[k];
         }
 
-        name[j + 1 + k] = '\0';
+        if (k > 0){
+            name[j + 1 + k] = '\0';
+        }
+        else{
+            name[j] = '\0';
+        }
 
         return 0;
 }
@@ -461,9 +455,10 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
         return 0;
     }
 
-    uint8_t * sector_data = calloc(1, stream->volumin->bytes_per_sector);
+    uint32_t cluster_size = stream->volumin->bytes_per_sector * stream->volumin->cluster_size;
+    uint8_t * cluster_data = calloc(1, cluster_size);
 
-    if (sector_data == NULL){
+    if (cluster_data == NULL){
 
         errno = EFAULT; // should be ENOMEM but in the task description there is no such option
         return -1;
@@ -472,55 +467,62 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
     size_t loaded_memb = 0;
     size_t size_to_read = size * nmemb;
     size_t rem_size_to_read = size * nmemb;
-    uint32_t intern_offset, avail_bytes_sector;
+
+    if (size_to_read > stream->size - stream->offset){
+
+        size_to_read = stream->size - stream->offset;
+        rem_size_to_read = size_to_read;
+    }
+
+    uint32_t intern_offset, avail_bytes_cluster;
 
     do{
 
-        if (stream->actual_cluster - 2u >= stream->volumin->num_of_sectors - stream->volumin->bef_data_size){
-
-            free(sector_data);
+        if ((stream->actual_cluster - 2) * stream->volumin->cluster_size >= stream->volumin->num_of_sectors - stream->volumin->bef_data_size){
+            free(cluster_data);
             errno = ENXIO;
             return -1;
         }
 
-        if (-1 == disk_read(stream->volumin->disk, stream->volumin->bef_data_size + stream->actual_cluster - 2, sector_data, 1)){
+        if (-1 == disk_read(stream->volumin->disk, stream->volumin->bef_data_size + (stream->actual_cluster - 2) * stream->volumin->cluster_size, cluster_data, stream->volumin->cluster_size)){
 
-            free(sector_data);
+            free(cluster_data);
             return -1;
         }
 
-        intern_offset = stream->offset % stream->volumin->bytes_per_sector;
-        avail_bytes_sector = stream->volumin->bytes_per_sector - intern_offset;
+        intern_offset = stream->offset % cluster_size;
+        avail_bytes_cluster = cluster_size - intern_offset;
 
-        if (rem_size_to_read <= avail_bytes_sector){
-
-            memcpy(sector_data + intern_offset, (uint8_t*)ptr + size_to_read - rem_size_to_read, rem_size_to_read);
+        if (rem_size_to_read <= avail_bytes_cluster){
+            memcpy((uint8_t*)ptr + size_to_read - rem_size_to_read, cluster_data + intern_offset, rem_size_to_read);
             loaded_memb = size_to_read / size;
             stream->offset += rem_size_to_read;
+
+            if (stream->offset % cluster_size == 0){
+
+                stream->actual_cluster = stream->volumin->clusters_indexes[stream->actual_cluster];
+            }
+
             break;
         }
         
-        memcpy(sector_data + intern_offset, (uint8_t*)ptr + size_to_read - rem_size_to_read, avail_bytes_sector);
-        rem_size_to_read -= avail_bytes_sector;
+        memcpy((uint8_t*)ptr + size_to_read - rem_size_to_read, cluster_data + intern_offset, avail_bytes_cluster);
+        rem_size_to_read -= avail_bytes_cluster;
         loaded_memb = (size_to_read - rem_size_to_read) / size;
-        stream->offset += avail_bytes_sector;
-
-        stream->actual_cluster = stream->volumin->clusters_indexes[stream->actual_cluster - 1];
+        stream->offset += avail_bytes_cluster;
+        stream->actual_cluster = stream->volumin->clusters_indexes[stream->actual_cluster];
 
     }while(stream->actual_cluster != LAST_CLUSTER);
 
-    free(sector_data);
-
-    // should I return a number of bytes when I can not read even 1 memb of data but I read a few bytes?
+    free(cluster_data);
 
     if (loaded_memb > 0){
 
-        if (nmemb > 1){
-            return loaded_memb;
-        }
-        else{
-            return size;
-        }
+        return loaded_memb;
+    }
+    else{
+
+        return size_to_read - rem_size_to_read;
     }
 
     return 0;
@@ -533,37 +535,51 @@ int32_t file_seek(struct file_t* stream, int32_t offset, int whence){
         errno = EFAULT;
         return -1;
     }
-    else if (whence < 0 || 2 < whence){
+
+    if (whence == 0){
+
+        if (offset < 0 || offset > (int32_t)stream->size){
+
+            errno = ENXIO;
+            return -1;
+        }
+        else{
+            stream->offset = (uint32_t)offset;
+        }
+    }
+    else if (whence == 1){
+
+        if ((int32_t)stream->offset + offset > (int32_t)stream->size || (int32_t)stream->offset + offset < 0){
+
+            errno = ENXIO;
+            return -1;
+        }
+        else{
+            stream->offset = stream->offset + offset;
+        }
+    }
+    else if (whence == 2){
+
+        if (offset > 0 || (int32_t)stream->size + offset < 0){
+
+            errno = ENXIO;
+            return -1;
+        }
+        else{
+            stream->offset = stream->size + offset;
+        }
+    }
+    else{
 
         errno = EINVAL;
         return -1;
     }
 
-    if (whence == 0 && (offset < 0 || offset > (int32_t)stream->size)){
+    stream->actual_cluster = stream->first_cluster;
 
-        errno = ENXIO;
-        return -1;
-    }
-    else{
-        stream->offset = (uint32_t)offset;
-    }
+    for (uint32_t i = 0; i < stream->offset / (stream->volumin->bytes_per_sector * stream->volumin->cluster_size); ++i){
 
-    if (whence == 1 && ((int32_t)stream->offset + offset > (int32_t)stream->size || (int32_t)stream->offset + offset < 0)){
-
-        errno = ENXIO;
-        return -1;
-    }
-    else{
-        stream->offset = stream->offset + offset;
-    }
-
-    if (whence == 2 && (offset > 0 || (int32_t)stream->offset + offset < 0)){
-
-        errno = ENXIO;
-        return -1;
-    }
-    else{
-        stream->offset = stream->offset + offset;
+        stream->actual_cluster = stream->volumin->clusters_indexes[stream->actual_cluster];
     }
 
     return stream->offset;

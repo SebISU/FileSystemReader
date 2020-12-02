@@ -774,7 +774,7 @@ LOAD /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
 .plt.sec
  *(.plt.sec)
 
-.text           0x0000000000002350    0x12f41
+.text           0x0000000000002350    0x130b1
  *(.text.unlikely .text.*_unlikely .text.unlikely.*)
  *(.text.exit .text.exit.*)
  *(.text.startup .text.startup.*)
@@ -785,131 +785,131 @@ LOAD /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
  .text          0x000000000000237b        0x0 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crti.o
  *fill*         0x000000000000237b        0x5 
  .text          0x0000000000002380       0xb5 /usr/lib/gcc/x86_64-linux-gnu/8/crtbeginS.o
- .text          0x0000000000002435     0x15fb build-dir/file_reader.c.o
+ .text          0x0000000000002435     0x1762 build-dir/file_reader.c.o
                 0x0000000000002435                disk_open_from_file
                 0x000000000000251c                disk_read
                 0x00000000000025ce                disk_close
                 0x0000000000002629                fat_open
-                0x0000000000002dba                fat_close
-                0x0000000000002e0a                file_open
-                0x00000000000030f8                convert_record_name
-                0x00000000000031f4                file_close
-                0x000000000000322c                file_read
-                0x00000000000034d2                file_seek
-                0x00000000000035fa                dir_open
-                0x000000000000374c                dir_read
-                0x00000000000039e9                dir_close
- .text          0x0000000000003a30        0xb build-dir/main.c.o
-                0x0000000000003a30                main
- .text          0x0000000000003a3b      0xa75 build-dir/unit_helper_v2.c.o
-                0x0000000000003a3b                unit_test_init
-                0x0000000000003aab                test_title
-                0x0000000000003ade                test_start
-                0x0000000000003b61                test_summary
-                0x0000000000003c0a                test_result_internal
-                0x0000000000003e82                test_terminate_session
-                0x0000000000003e9f                test_get_session_termination_flag
-                0x0000000000003eab                test_set_session_leaks
-                0x0000000000003ebe                test_single_has_failed
-                0x0000000000003ed2                test_session_get_fail_count
-                0x0000000000003ede                mem_find_first_difference
-                0x0000000000003f84                mem_get_byte
-                0x0000000000003fa9                mem_dump_diff
-                0x00000000000041a2                mem_compare
-                0x00000000000041ff                test_internal_error
-                0x0000000000004282                test_limit_init
-                0x000000000000429f                test_memory_limit_setup
-                0x000000000000434a                test_memory_limit_restore
-                0x0000000000004351                test_signal_handler
-                0x00000000000043b6                test_file_write_limit_setup
-                0x000000000000445f                test_file_write_limit_restore
- .text          0x00000000000044b0     0xd6d5 build-dir/unit_test_v2.c.o
-                0x00000000000044b0                UTEST1
-                0x00000000000045b0                UTEST2
-                0x00000000000046ae                UTEST3
-                0x0000000000004765                UTEST4
-                0x00000000000048d8                UTEST5
-                0x00000000000049db                UTEST6
-                0x0000000000004e30                UTEST7
-                0x00000000000053fb                UTEST8
-                0x00000000000059c6                UTEST9
-                0x0000000000005f91                UTEST10
-                0x0000000000006462                UTEST11
-                0x0000000000006a2d                UTEST12
-                0x0000000000006e7d                UTEST13
-                0x00000000000072d2                UTEST14
-                0x000000000000789d                UTEST15
-                0x0000000000007e68                UTEST16
-                0x0000000000008433                UTEST17
-                0x0000000000008904                UTEST18
-                0x0000000000008ecf                UTEST19
-                0x000000000000931f                UTEST20
-                0x0000000000009757                UTEST21
-                0x0000000000009d05                UTEST22
-                0x000000000000a2b3                UTEST23
-                0x000000000000a861                UTEST24
-                0x000000000000ad15                UTEST25
-                0x000000000000b2c3                UTEST26
-                0x000000000000b6f6                UTEST27
-                0x000000000000bd61                UTEST28
-                0x000000000000d90f                UTEST29
-                0x000000000000de90                UTEST30
-                0x000000000000e29b                UTEST31
-                0x000000000000e832                UTEST32
-                0x000000000000ea2d                UTEST33
-                0x000000000000ec28                UTEST34
-                0x000000000000ee23                UTEST35
-                0x000000000000f01e                UTEST36
-                0x000000000000f219                UTEST37
-                0x000000000000f414                UTEST38
-                0x000000000000f60f                UTEST39
-                0x000000000000f80a                UTEST40
-                0x000000000000fa05                UTEST41
-                0x000000000000fbfe                UTEST42
-                0x000000000000fdf7                UTEST43
-                0x000000000000ffee                UTEST44
-                0x00000000000100a5                UTEST45
-                0x0000000000010320                UTEST46
-                0x0000000000010836                UTEST47
-                0x0000000000010a31                UTEST48
-                0x0000000000010c2c                UTEST49
-                0x0000000000010e27                UTEST50
-                0x0000000000011022                UTEST51
-                0x000000000001121d                UTEST52
-                0x0000000000011418                UTEST53
-                0x0000000000011613                UTEST54
-                0x000000000001180e                __wrap_main
- .text          0x0000000000011b85     0x36a6 build-dir/rdebug.c.o
-                0x0000000000012040                print_source_location
-                0x0000000000012397                _rldebug_heap_wrapper
-                0x0000000000013623                _rldebug_str_wrapper
-                0x0000000000013f34                _rldebug_io_wrapper
-                0x00000000000142bb                _rldebug_stdlib_noreturn_wrapper
-                0x00000000000143e4                rldebug_show_leaked_resources
-                0x0000000000014970                rldebug_heap_get_leak_size
-                0x00000000000149bc                rldebug_get_block_size
-                0x0000000000014ec2                rldebug_reset_limits
-                0x0000000000014f54                rldebug_heap_set_global_limit
-                0x0000000000014f90                rldebug_heap_disable_all_functions
-                0x0000000000014fa3                rldebug_heap_set_function_singleshot_limit
-                0x0000000000015002                rldebug_heap_set_function_cumulative_limit
-                0x0000000000015061                rldebug_set_function_success_limit
-                0x00000000000150c0                rldebug_set_reported_severity_level
-                0x00000000000150d3                remove_single_newline
-                0x0000000000015157                rdebug_call_main
- *fill*         0x000000000001522b        0x5 
- .text          0x0000000000015230       0x61 //usr/lib/x86_64-linux-gnu/libc_nonshared.a(elf-init.oS)
-                0x0000000000015230                __libc_csu_init
-                0x0000000000015290                __libc_csu_fini
- .text          0x0000000000015291        0x0 /usr/lib/gcc/x86_64-linux-gnu/8/crtendS.o
- .text          0x0000000000015291        0x0 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
+                0x0000000000002e0a                fat_close
+                0x0000000000002e5a                file_open
+                0x000000000000313e                convert_record_name
+                0x0000000000003252                file_close
+                0x000000000000328a                file_read
+                0x00000000000035c9                file_seek
+                0x0000000000003761                dir_open
+                0x00000000000038b3                dir_read
+                0x0000000000003b50                dir_close
+ .text          0x0000000000003b97        0xb build-dir/main.c.o
+                0x0000000000003b97                main
+ .text          0x0000000000003ba2      0xa75 build-dir/unit_helper_v2.c.o
+                0x0000000000003ba2                unit_test_init
+                0x0000000000003c12                test_title
+                0x0000000000003c45                test_start
+                0x0000000000003cc8                test_summary
+                0x0000000000003d71                test_result_internal
+                0x0000000000003fe9                test_terminate_session
+                0x0000000000004006                test_get_session_termination_flag
+                0x0000000000004012                test_set_session_leaks
+                0x0000000000004025                test_single_has_failed
+                0x0000000000004039                test_session_get_fail_count
+                0x0000000000004045                mem_find_first_difference
+                0x00000000000040eb                mem_get_byte
+                0x0000000000004110                mem_dump_diff
+                0x0000000000004309                mem_compare
+                0x0000000000004366                test_internal_error
+                0x00000000000043e9                test_limit_init
+                0x0000000000004406                test_memory_limit_setup
+                0x00000000000044b1                test_memory_limit_restore
+                0x00000000000044b8                test_signal_handler
+                0x000000000000451d                test_file_write_limit_setup
+                0x00000000000045c6                test_file_write_limit_restore
+ .text          0x0000000000004617     0xd6d5 build-dir/unit_test_v2.c.o
+                0x0000000000004617                UTEST1
+                0x0000000000004717                UTEST2
+                0x0000000000004815                UTEST3
+                0x00000000000048cc                UTEST4
+                0x0000000000004a3f                UTEST5
+                0x0000000000004b42                UTEST6
+                0x0000000000004f97                UTEST7
+                0x0000000000005562                UTEST8
+                0x0000000000005b2d                UTEST9
+                0x00000000000060f8                UTEST10
+                0x00000000000065c9                UTEST11
+                0x0000000000006b94                UTEST12
+                0x0000000000006fe4                UTEST13
+                0x0000000000007439                UTEST14
+                0x0000000000007a04                UTEST15
+                0x0000000000007fcf                UTEST16
+                0x000000000000859a                UTEST17
+                0x0000000000008a6b                UTEST18
+                0x0000000000009036                UTEST19
+                0x0000000000009486                UTEST20
+                0x00000000000098be                UTEST21
+                0x0000000000009e6c                UTEST22
+                0x000000000000a41a                UTEST23
+                0x000000000000a9c8                UTEST24
+                0x000000000000ae7c                UTEST25
+                0x000000000000b42a                UTEST26
+                0x000000000000b85d                UTEST27
+                0x000000000000bec8                UTEST28
+                0x000000000000da76                UTEST29
+                0x000000000000dff7                UTEST30
+                0x000000000000e402                UTEST31
+                0x000000000000e999                UTEST32
+                0x000000000000eb94                UTEST33
+                0x000000000000ed8f                UTEST34
+                0x000000000000ef8a                UTEST35
+                0x000000000000f185                UTEST36
+                0x000000000000f380                UTEST37
+                0x000000000000f57b                UTEST38
+                0x000000000000f776                UTEST39
+                0x000000000000f971                UTEST40
+                0x000000000000fb6c                UTEST41
+                0x000000000000fd65                UTEST42
+                0x000000000000ff5e                UTEST43
+                0x0000000000010155                UTEST44
+                0x000000000001020c                UTEST45
+                0x0000000000010487                UTEST46
+                0x000000000001099d                UTEST47
+                0x0000000000010b98                UTEST48
+                0x0000000000010d93                UTEST49
+                0x0000000000010f8e                UTEST50
+                0x0000000000011189                UTEST51
+                0x0000000000011384                UTEST52
+                0x000000000001157f                UTEST53
+                0x000000000001177a                UTEST54
+                0x0000000000011975                __wrap_main
+ .text          0x0000000000011cec     0x36a6 build-dir/rdebug.c.o
+                0x00000000000121a7                print_source_location
+                0x00000000000124fe                _rldebug_heap_wrapper
+                0x000000000001378a                _rldebug_str_wrapper
+                0x000000000001409b                _rldebug_io_wrapper
+                0x0000000000014422                _rldebug_stdlib_noreturn_wrapper
+                0x000000000001454b                rldebug_show_leaked_resources
+                0x0000000000014ad7                rldebug_heap_get_leak_size
+                0x0000000000014b23                rldebug_get_block_size
+                0x0000000000015029                rldebug_reset_limits
+                0x00000000000150bb                rldebug_heap_set_global_limit
+                0x00000000000150f7                rldebug_heap_disable_all_functions
+                0x000000000001510a                rldebug_heap_set_function_singleshot_limit
+                0x0000000000015169                rldebug_heap_set_function_cumulative_limit
+                0x00000000000151c8                rldebug_set_function_success_limit
+                0x0000000000015227                rldebug_set_reported_severity_level
+                0x000000000001523a                remove_single_newline
+                0x00000000000152be                rdebug_call_main
+ *fill*         0x0000000000015392        0xe 
+ .text          0x00000000000153a0       0x61 //usr/lib/x86_64-linux-gnu/libc_nonshared.a(elf-init.oS)
+                0x00000000000153a0                __libc_csu_init
+                0x0000000000015400                __libc_csu_fini
+ .text          0x0000000000015401        0x0 /usr/lib/gcc/x86_64-linux-gnu/8/crtendS.o
+ .text          0x0000000000015401        0x0 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
  *(.gnu.warning)
 
-.fini           0x0000000000015294        0x9
+.fini           0x0000000000015404        0x9
  *(SORT_NONE(.fini))
- .fini          0x0000000000015294        0x4 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crti.o
-                0x0000000000015294                _fini
- .fini          0x0000000000015298        0x5 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
+ .fini          0x0000000000015404        0x4 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crti.o
+                0x0000000000015404                _fini
+ .fini          0x0000000000015408        0x5 /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
                 [!provide]                        PROVIDE (__etext = .)
                 [!provide]                        PROVIDE (_etext = .)
                 [!provide]                        PROVIDE (etext = .)
@@ -1186,13 +1186,13 @@ LOAD /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
 .debug_pubnames
  *(.debug_pubnames)
 
-.debug_info     0x0000000000000000     0x6371
+.debug_info     0x0000000000000000     0x638b
  *(.debug_info .gnu.linkonce.wi.*)
- .debug_info    0x0000000000000000      0xf47 build-dir/file_reader.c.o
- .debug_info    0x0000000000000f47      0x382 build-dir/main.c.o
- .debug_info    0x00000000000012c9      0xd1c build-dir/unit_helper_v2.c.o
- .debug_info    0x0000000000001fe5     0x278b build-dir/unit_test_v2.c.o
- .debug_info    0x0000000000004770     0x1c01 build-dir/rdebug.c.o
+ .debug_info    0x0000000000000000      0xf61 build-dir/file_reader.c.o
+ .debug_info    0x0000000000000f61      0x382 build-dir/main.c.o
+ .debug_info    0x00000000000012e3      0xd1c build-dir/unit_helper_v2.c.o
+ .debug_info    0x0000000000001fff     0x278b build-dir/unit_test_v2.c.o
+ .debug_info    0x000000000000478a     0x1c01 build-dir/rdebug.c.o
 
 .debug_abbrev   0x0000000000000000      0xc39
  *(.debug_abbrev)
@@ -1202,28 +1202,28 @@ LOAD /usr/lib/gcc/x86_64-linux-gnu/8/../../../x86_64-linux-gnu/crtn.o
  .debug_abbrev  0x000000000000068f      0x2a4 build-dir/unit_test_v2.c.o
  .debug_abbrev  0x0000000000000933      0x306 build-dir/rdebug.c.o
 
-.debug_line     0x0000000000000000     0x608d
+.debug_line     0x0000000000000000     0x6140
  *(.debug_line .debug_line.* .debug_line_end)
- .debug_line    0x0000000000000000      0xf39 build-dir/file_reader.c.o
- .debug_line    0x0000000000000f39      0x364 build-dir/main.c.o
- .debug_line    0x000000000000129d      0x9b3 build-dir/unit_helper_v2.c.o
- .debug_line    0x0000000000001c50     0x3043 build-dir/unit_test_v2.c.o
- .debug_line    0x0000000000004c93     0x13fa build-dir/rdebug.c.o
+ .debug_line    0x0000000000000000      0xfec build-dir/file_reader.c.o
+ .debug_line    0x0000000000000fec      0x364 build-dir/main.c.o
+ .debug_line    0x0000000000001350      0x9b3 build-dir/unit_helper_v2.c.o
+ .debug_line    0x0000000000001d03     0x3043 build-dir/unit_test_v2.c.o
+ .debug_line    0x0000000000004d46     0x13fa build-dir/rdebug.c.o
 
 .debug_frame
  *(.debug_frame)
 
-.debug_str      0x0000000000000000    0x12b64
+.debug_str      0x0000000000000000    0x12b66
  *(.debug_str)
- .debug_str     0x0000000000000000     0x9465 build-dir/file_reader.c.o
-                                       0x985d (size before relaxing)
- .debug_str     0x0000000000009465        0x7 build-dir/main.c.o
+ .debug_str     0x0000000000000000     0x9467 build-dir/file_reader.c.o
+                                       0x9865 (size before relaxing)
+ .debug_str     0x0000000000009467        0x7 build-dir/main.c.o
                                        0x59c9 (size before relaxing)
- .debug_str     0x000000000000946c     0x29f4 build-dir/unit_helper_v2.c.o
+ .debug_str     0x000000000000946e     0x29f4 build-dir/unit_helper_v2.c.o
                                        0x9ea6 (size before relaxing)
- .debug_str     0x000000000000be60      0x93f build-dir/unit_test_v2.c.o
+ .debug_str     0x000000000000be62      0x93f build-dir/unit_test_v2.c.o
                                        0x9549 (size before relaxing)
- .debug_str     0x000000000000c79f     0x63c5 build-dir/rdebug.c.o
+ .debug_str     0x000000000000c7a1     0x63c5 build-dir/rdebug.c.o
                                        0xf36b (size before relaxing)
 
 .debug_loc
