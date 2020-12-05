@@ -130,9 +130,17 @@ struct dir_t{
 
 } __attribute__((__packed__));
 
+
+struct dir_t_node{
+
+    struct dir_t * dir;
+    struct dir_t_node * prev_dir;
+};
+
 struct dir_entry_t{
 
     uint32_t size;
+    uint32_t first_cluster;
     char name[13];
     uint8_t is_archived : 1;
     uint8_t is_readonly : 1;
@@ -156,5 +164,8 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry);
 int dir_close(struct dir_t* pdir);
 int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name);
 int own_strcmp(const char * file_name1, const char * file_name2);
+struct dir_t * dir_tree_push(struct dir_t_node * head, uint32_t dir_size);
+struct dir_t * dir_tree_pop(struct dir_t_node * head);
+int dir_tree_free(struct dir_t_node * head);
 
 #endif

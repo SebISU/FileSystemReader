@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
@@ -14,8 +13,9 @@
 #define SECTOR_SIZE 512
 #define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, author of the task suggests 0x55AA BIG vs. LITTLE endian?
 #define LAST_CLUSTER 0xffff
-#define POWER_OF_TWO(x) ((x & (x - 1)) && x)
+#define POWER_OF_TWO(x) ((x & (x - 1)) && x)    // check if value is a power of two
 #define MAX_CLUSTER_SIZE 64
+#define FIRST_CLUSTER(x, y)  ((x << 16) | y)    // calculate the file first cluster
 
 
 struct disk_t* disk_open_from_file(const char* volume_file_name){
@@ -373,10 +373,8 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
             file->volumin = pvolume;
             file->offset = 0;
             file->size = (root_dir + i)->size;
-            uint32_t cluster = (root_dir + i)->high_order_address_of_first_cluster << 16;
-            cluster |= (root_dir + i)->low_order_address_of_first_cluster;
-            file->first_cluster = cluster;
-            file->actual_cluster = cluster;
+            file->first_cluster = FIRST_CLUSTER((root_dir + i)->high_order_address_of_first_cluster, (root_dir + i)->low_order_address_of_first_cluster);
+            file->actual_cluster = file->first_cluster;
 
             free(root_dir);
             return file;
@@ -615,8 +613,6 @@ int32_t file_seek(struct file_t* stream, int32_t offset, int whence){
     return stream->offset;
 }
 
-// for extended paths use strtok()
-
 struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     if (pvolume == NULL || dir_path == NULL){
@@ -625,39 +621,154 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
         return NULL;
     }
 
-    if (strcmp("\\", dir_path) != 0){
+    if (strlen(dir_path) == 0){
 
         errno = ENOENT;
         return NULL;
     }
 
-    struct dir_t * dir = calloc(1, sizeof(struct dir_t));
+    struct dir_entry_t * file_info = calloc(1, sizeof(struct dir_entry_t));
 
-    if (dir == NULL){
+    if (file_info == NULL){
 
         errno = ENOMEM;
         return NULL;
     }
 
-    dir->current_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
+    struct dir_t_node * search_path; 
+    struct dir_t * dir = dir_tree_push(search_path, pvolume->num_of_files_root_dir * sizeof(struct SFN));
 
-    if (dir->current_dir == NULL){
+    if (dir == NULL){
 
+        free(file_info);
         errno = ENOMEM;
         return NULL;
     }
 
     if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, dir->current_dir, pvolume->root_dir_size)){
 
-        free(dir->current_dir);
-        free(dir);
+        dir_tree_free(search_path);
         return NULL;
     }
 
-    dir->num_of_records = pvolume->num_of_files_root_dir;
-    dir->index_record = 0;
+    char * filename = strtok(dir_path, "\\");
+
+    while(filename != NULL){
+
+        if (strcmp(filename, ".") == 0){
+
+            continue;
+        }
+
+        if (strcmp(filename, "..") == 0){
+
+            dir_tree_pop(search_path);
+
+            if (search_path == NULL){
+
+                dir_tree_free(search_path);
+                free(file_info);
+                errno = ENXIO; // good?
+                return NULL;
+            }
+        }
+
+        while (dir_read(dir, file_info) == 0){
+
+            if (own_strcmp(file_info->name, filename) == 0){
+
+                int w = 1;
+            }
+
+        //     dir_tree_free(search_path);
+        //     free(file_info);
+        //     return NULL;
+        
+        }
+
+    }
 
     return dir;
+}
+
+struct dir_t * dir_tree_push(struct dir_t_node * head, uint32_t dir_size){
+
+
+    struct dir_t_node * new_dir_node = calloc(1, sizeof(struct dir_t_node));
+
+    if (new_dir_node == NULL){
+
+        return NULL;
+    }
+
+    new_dir_node->dir = calloc(1, sizeof(struct dir_t));
+
+    if (new_dir_node->dir == NULL){
+
+        free(new_dir_node);
+        return NULL;
+    }
+
+    new_dir_node->dir->current_dir = calloc(1, dir_size);
+
+    if (new_dir_node->dir->current_dir == NULL){
+
+        free(new_dir_node->dir);
+        free(new_dir_node);
+        return NULL;
+    }
+
+    new_dir_node->dir->index_record = 0;
+    new_dir_node->dir->num_of_records = dir_size / sizeof(struct SFN);
+
+    if (head == NULL){
+
+        new_dir_node->prev_dir = NULL;
+    }
+    else{
+
+        new_dir_node->prev_dir = head;
+    }
+
+    head = new_dir_node;
+
+    return head->dir;
+}
+
+struct dir_t * dir_tree_pop(struct dir_t_node * head){
+
+    if (head == NULL || head->dir == NULL){ // not sure if head_dir needed
+
+        return NULL;
+    }
+
+    struct dir_t * actual = head->dir;
+    struct dir_t_node * now_head = head;
+    head = head->prev_dir;
+    free(now_head);
+    
+    return actual;
+}
+
+int dir_tree_free(struct dir_t_node * head){
+
+    if (head == NULL){
+
+        return 1;
+    }
+
+    struct dir_t_node * actual_node;
+
+    while(head != NULL){
+
+        free(head->dir->current_dir);
+        free(head->dir);
+        actual_node = head;
+        head = head->prev_dir;
+        free(actual_node);
+    }
+
+    return 0;
 }
 
 int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
@@ -689,6 +800,7 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
             pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
             pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
             pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
+            pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
             pdir->index_record++;
 
             return 0;

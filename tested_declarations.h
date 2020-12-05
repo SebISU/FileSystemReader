@@ -1,7 +1,7 @@
 /*
- * Test dla zadania Projekt: czytnik dysku, woluminu, katalogu głównego i plików (3,0)
+ * Test dla zadania Projekt: ścieżki bezwzględne, wielkości liter (4,0)
  * Autor testowanej odpowiedzi: Sebastian Derendarz
- * Test wygenerowano automatycznie o 2020-12-02 11:34:12.781008
+ * Test wygenerowano automatycznie o 2020-12-05 14:22:19.187143
  *
  * Debug: { { test|pprint } }
  */
