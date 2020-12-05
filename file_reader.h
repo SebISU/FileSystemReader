@@ -156,5 +156,4 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry);
 int dir_close(struct dir_t* pdir);
 int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name);
 
-
 #endif
