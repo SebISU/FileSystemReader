@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 #include <time.h>
 #include "file_reader.h"
 #define UNALLOCATED 0x00
@@ -358,8 +359,8 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         }
 
         convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
-
-        if (0 == strcmp(file_name, (const char*)file->name)){
+        
+        if (0 == own_strcmp(file_name, (const char*)file->name)){
 
             if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
 
@@ -389,6 +390,36 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
     free(file);
     errno = ENOENT;
     return NULL;
+}
+
+int own_strcmp(const char * file_name1, const char * file_name2){
+
+    if (file_name1 == NULL || file_name2 == NULL){
+
+        return -2;
+    }
+
+    uint32_t size1 = strlen(file_name1);
+    uint32_t size2 = strlen(file_name2);
+
+    for (uint32_t i = 0; i < (size1 < size2 ? size1 : size2); ++i){
+
+        if (toupper(file_name1[i]) > toupper(file_name2[i])){
+            return 1;
+        }
+        else if (toupper(file_name1[i]) < toupper(file_name2[i])){
+            return -1;
+        }
+    }
+
+    if (size1 < size2){
+        return -1;
+    }
+    else if (size1 > size2){
+        return 1;
+    }
+
+    return 0;
 }
 
 int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name){

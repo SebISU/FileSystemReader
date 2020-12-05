@@ -155,5 +155,6 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path);
 int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry);
 int dir_close(struct dir_t* pdir);
 int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name);
+int own_strcmp(const char * file_name1, const char * file_name2);
 
 #endif

@@ -252,7 +252,7 @@ void UTEST6(void)
                 test_error(volume != NULL, "Funkcja fat_open() niepoprawnie otworzyła wolumin");
                 onerror_terminate(); // przerwanie wszystkich testów jednostkowych (np. coś jest mocno nie tak z kodem)
         
-                struct file_t* file = file_open(volume, "WANT.TXT");
+                struct file_t* file = file_open(volume, "want.TXT");
                 test_error(file != NULL, "Funkcja file_open() niepoprawnie otworzyła plik");
                 onerror_terminate(); // przerwanie wszystkich testów jednostkowych (np. coś jest mocno nie tak z kodem)
         
