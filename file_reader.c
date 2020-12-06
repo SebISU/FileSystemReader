@@ -382,10 +382,9 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
     struct dir_entry_t dir_file;
     int32_t flag = dir_read(final_dir, &dir_file);
-
     while (flag == 0){
 
-        if (own_strcmp(file_name + last_bslash + 1, dir_file.name) == 0){
+        if (own_strcmp(file_name + last_bslash, dir_file.name) == 0){
 
             if (dir_file.is_directory == 1){
 
@@ -413,13 +412,13 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         errno = ENOENT;
         return NULL;
     }
-    else{
+    else if (flag == -1){
 
         return NULL;
     }
 
     free(final_dir);
-
+    
     return final_file;
 }
 
@@ -724,7 +723,7 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     struct dir_entry_t file_info;
     struct file_t temp_file;
-    struct dir_t_node * search_path; 
+    struct dir_t_node * search_path = NULL; 
     struct dir_t * dir = dir_tree_push(&search_path, pvolume->num_of_files_root_dir * sizeof(struct SFN));
 
     if (dir == NULL){
@@ -784,6 +783,8 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
             if (own_strcmp(file_info.name, filename) == 0){
 
+                printf("file: %s\n", filename);
+                printf("file ss: %s\n", file_info.name);
                 if (file_info.is_directory == 0){
 
                     dir_tree_free(&search_path);
@@ -847,9 +848,7 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     free(dir_path_copy);
     dir = dir_tree_pop(&search_path);
-    printf("%ld\n", (intptr_t)&search_path);    // look at this
     dir_tree_free(&search_path);
-printf("KONGO\n");  //look at this
 
     return dir;
 }
