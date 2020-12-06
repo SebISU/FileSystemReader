@@ -329,66 +329,161 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         return NULL;
     }
 
-    struct SFN * root_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
+    if (file_name[strlen(file_name)-1] == '\\'){
 
-    if (root_dir == NULL){
-
-        errno = ENOMEM;
+        errno = EISDIR;
         return NULL;
     }
 
-    if (-1 == disk_read(pvolume->disk, pvolume->bef_data_size - pvolume->root_dir_size, root_dir, pvolume->root_dir_size)){
+    uint32_t last_bslash = 0;
 
-        free(root_dir);
-        return NULL;
-    }
+    for (uint32_t i = 0; i < strlen(file_name); ++i){
 
-    struct file_t * file = calloc(1, sizeof(struct file_t));
-
-    if (file == NULL){
-
-        free(root_dir);
-        errno = ENOMEM;
-        return NULL;
-    }
-
-    for (uint32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
-
-        if (*((uint8_t*)(root_dir + i)) == UNALLOCATED || *((uint8_t*)(root_dir + i)) == DELETED){
-            continue;
+        if (file_name[i] == '\\'){
+            last_bslash = i;
         }
+    }
 
-        convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
-        
-        if (0 == own_strcmp(file_name, (const char*)file->name)){
+    char * temp_path = calloc(1, last_bslash + 2);
 
-            if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
+    if (temp_path == NULL){
 
-                free(root_dir);
-                free(file);
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    if (last_bslash == 0 && file_name[0] != '\\'){
+
+        strcpy(temp_path, "\\");    //check if NULL at the end 
+        temp_path[last_bslash + 1] = '\0';
+    }
+    else{
+        strncpy(temp_path, file_name, last_bslash + 1);
+        temp_path[last_bslash + 1] = '\0';
+    }
+
+    struct dir_t * final_dir = dir_open(pvolume, temp_path);    // here problem
+
+    free(temp_path);
+
+    if (final_dir == NULL){
+
+        return NULL;
+    }
+
+    struct file_t * final_file = calloc(1, sizeof(struct file_t));
+
+    if  (final_file == NULL){
+
+        free(final_dir);
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    struct dir_entry_t dir_file;
+    int32_t flag = dir_read(final_dir, &dir_file);
+
+    while (flag == 0){
+
+        if (own_strcmp(file_name + last_bslash + 1, dir_file.name) == 0){
+
+            if (dir_file.is_directory == 1){
+
+                free(final_dir);
+                free(final_file);
                 errno = EISDIR;
                 return NULL;
             }
 
-            file->volumin = pvolume;
-            file->offset = 0;
-            file->size = (root_dir + i)->size;
-            file->first_cluster = FIRST_CLUSTER((root_dir + i)->high_order_address_of_first_cluster, (root_dir + i)->low_order_address_of_first_cluster);
-            file->actual_cluster = file->first_cluster;
+            final_file->offset = 0;
+            final_file->volumin = pvolume;
+            final_file->size = dir_file.size;
+            final_file->first_cluster = dir_file.first_cluster;
+            final_file->actual_cluster = dir_file.first_cluster;
+            strcpy(final_file->name, dir_file.name);
 
-            free(root_dir);
-            return file;
+            break;
         }
-        else{
-            continue;
-        }
+
+        flag = dir_read(final_dir, &dir_file);
     }
 
-    free(root_dir);
-    free(file);
-    errno = ENOENT;
-    return NULL;
+    if (flag == 1){
+
+        errno = ENOENT;
+        return NULL;
+    }
+    else{
+
+        return NULL;
+    }
+
+    free(final_dir);
+
+    return final_file;
 }
+
+
+//     struct SFN * root_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
+
+//     if (root_dir == NULL){
+
+//         errno = ENOMEM;
+//         return NULL;
+//     }
+
+//     if (-1 == disk_read(pvolume->disk, pvolume->bef_data_size - pvolume->root_dir_size, root_dir, pvolume->root_dir_size)){
+
+//         free(root_dir);
+//         return NULL;
+//     }
+
+//     struct file_t * file = calloc(1, sizeof(struct file_t));
+
+//     if (file == NULL){
+
+//         free(root_dir);
+//         errno = ENOMEM;
+//         return NULL;
+//     }
+
+//     for (uint32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
+
+//         if (*((uint8_t*)(root_dir + i)) == UNALLOCATED || *((uint8_t*)(root_dir + i)) == DELETED){
+//             continue;
+//         }
+
+//         convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
+        
+//         if (0 == own_strcmp(file_name, (const char*)file->name)){
+
+//             if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
+
+//                 free(root_dir);
+//                 free(file);
+//                 errno = EISDIR;
+//                 return NULL;
+//             }
+
+//             file->volumin = pvolume;
+//             file->offset = 0;
+//             file->size = (root_dir + i)->size;
+//             file->first_cluster = FIRST_CLUSTER((root_dir + i)->high_order_address_of_first_cluster, (root_dir + i)->low_order_address_of_first_cluster);
+//             file->actual_cluster = file->first_cluster;
+
+//             free(root_dir);
+//             return file;
+//         }
+//         else{
+//             continue;
+//         }
+//     }
+
+//     free(root_dir);
+//     free(file);
+//     errno = ENOENT;
+//     return NULL;
+// }
 
 int own_strcmp(const char * file_name1, const char * file_name2){
 
@@ -488,7 +583,7 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
     if (cluster_data == NULL){
 
-        errno = EFAULT; // should be ENOMEM but in the task description there is no such option
+        errno = ENOMEM; // EFAULT before
         return -1;
     }
 
@@ -627,31 +722,37 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
         return NULL;
     }
 
-    struct dir_entry_t * file_info = calloc(1, sizeof(struct dir_entry_t));
-
-    if (file_info == NULL){
-
-        errno = ENOMEM;
-        return NULL;
-    }
-
+    struct dir_entry_t file_info;
+    struct file_t temp_file;
     struct dir_t_node * search_path; 
-    struct dir_t * dir = dir_tree_push(search_path, pvolume->num_of_files_root_dir * sizeof(struct SFN));
+    struct dir_t * dir = dir_tree_push(&search_path, pvolume->num_of_files_root_dir * sizeof(struct SFN));
 
     if (dir == NULL){
 
-        free(file_info);
         errno = ENOMEM;
         return NULL;
     }
 
     if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, dir->current_dir, pvolume->root_dir_size)){
 
-        dir_tree_free(search_path);
+        dir_tree_free(&search_path);
         return NULL;
     }
 
-    char * filename = strtok(dir_path, "\\");
+    char * dir_path_copy = calloc(1, strlen(dir_path) + 1);
+
+    if (dir_path_copy == NULL){
+
+        dir_tree_free(&search_path);
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    strcpy(dir_path_copy, dir_path);
+    dir_path_copy[strlen(dir_path)] = '\0';
+
+    int32_t flag = 0;
+    char * filename = strtok(dir_path_copy, "\\");
 
     while(filename != NULL){
 
@@ -662,37 +763,103 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
         if (strcmp(filename, "..") == 0){
 
-            dir_tree_pop(search_path);
+            dir = dir_tree_pop(&search_path);
+            free(dir);
 
             if (search_path == NULL){
 
-                dir_tree_free(search_path);
-                free(file_info);
-                errno = ENXIO; // good?
+                //dir_tree_free(search_path);
+                free(dir_path_copy);
+                errno = ENOENT; // good?
                 return NULL;
             }
+
+            dir = dir_tree_pop(&search_path);
+            continue;
         }
 
-        while (dir_read(dir, file_info) == 0){
+        flag = dir_read(dir, &file_info);
 
-            if (own_strcmp(file_info->name, filename) == 0){
+        while (flag == 0){
 
-                int w = 1;
+            if (own_strcmp(file_info.name, filename) == 0){
+
+                if (file_info.is_directory == 0){
+
+                    dir_tree_free(&search_path);
+                    free(dir_path_copy);
+                    errno = ENOTDIR;
+                    return NULL;
+                }
+
+                dir = dir_tree_push(&search_path, file_info.size);
+
+                if (dir == NULL){
+
+                    dir_tree_free(&search_path);
+                    free(dir_path_copy);
+                    errno = ENOMEM;
+                    return NULL;
+                }
+
+                temp_file.offset = 0;
+                temp_file.volumin = pvolume;
+                temp_file.size = file_info.size;
+                temp_file.first_cluster = file_info.first_cluster;
+                temp_file.actual_cluster = file_info.first_cluster;
+                strcpy(temp_file.name, file_info.name);
+
+
+                if (file_read(dir->current_dir, file_info.size, 1, &temp_file) <= 0){
+
+                    dir_tree_free(&search_path);
+                    free(dir_path_copy);
+                    return NULL;
+                }
+                else{
+
+                    dir->index_record = 0;
+                    dir->num_of_records = file_info.size / sizeof(struct SFN);
+
+                    break;
+                }
             }
 
-        //     dir_tree_free(search_path);
-        //     free(file_info);
-        //     return NULL;
-        
+            flag = dir_read(dir, &file_info);
         }
 
+        if (flag == 1){
+
+            dir_tree_free(&search_path);
+            free(dir_path_copy);
+            errno = ENOENT;
+            return NULL;
+        }
+        else if (flag == -1){
+
+            free(dir_path_copy);
+            dir_tree_free(&search_path);
+            return NULL;
+        }
+
+        filename = strtok(NULL, "\\");
     }
+
+    free(dir_path_copy);
+    dir = dir_tree_pop(&search_path);
+    printf("%ld\n", (intptr_t)&search_path);    // look at this
+    dir_tree_free(&search_path);
+printf("KONGO\n");  //look at this
 
     return dir;
 }
 
-struct dir_t * dir_tree_push(struct dir_t_node * head, uint32_t dir_size){
+struct dir_t * dir_tree_push(struct dir_t_node ** head, uint32_t dir_size){
 
+    if (head == NULL){
+
+        return NULL;
+    }
 
     struct dir_t_node * new_dir_node = calloc(1, sizeof(struct dir_t_node));
 
@@ -721,50 +888,50 @@ struct dir_t * dir_tree_push(struct dir_t_node * head, uint32_t dir_size){
     new_dir_node->dir->index_record = 0;
     new_dir_node->dir->num_of_records = dir_size / sizeof(struct SFN);
 
-    if (head == NULL){
+    if (*head == NULL){
 
         new_dir_node->prev_dir = NULL;
     }
     else{
 
-        new_dir_node->prev_dir = head;
+        new_dir_node->prev_dir = *head;
     }
 
-    head = new_dir_node;
+    *head = new_dir_node;
 
-    return head->dir;
+    return (*head)->dir;
 }
 
-struct dir_t * dir_tree_pop(struct dir_t_node * head){
+struct dir_t * dir_tree_pop(struct dir_t_node ** head){
 
-    if (head == NULL || head->dir == NULL){ // not sure if head_dir needed
+    if (head == NULL || *head == NULL || (*head)->dir == NULL){ // not sure if head_dir needed
 
         return NULL;
     }
 
-    struct dir_t * actual = head->dir;
-    struct dir_t_node * now_head = head;
-    head = head->prev_dir;
+    struct dir_t * actual = (*head)->dir;
+    struct dir_t_node * now_head = *head;
+    *head = (*head)->prev_dir;
     free(now_head);
     
     return actual;
 }
 
-int dir_tree_free(struct dir_t_node * head){
+int dir_tree_free(struct dir_t_node ** head){
 
-    if (head == NULL){
+    if (head == NULL || *head == NULL){
 
         return 1;
     }
 
     struct dir_t_node * actual_node;
 
-    while(head != NULL){
+    while(*head != NULL){
 
-        free(head->dir->current_dir);
-        free(head->dir);
-        actual_node = head;
-        head = head->prev_dir;
+        free((*head)->dir->current_dir);
+        free((*head)->dir);
+        actual_node = *head;
+        *head = (*head)->prev_dir;
         free(actual_node);
     }
 
