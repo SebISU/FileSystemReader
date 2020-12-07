@@ -17,6 +17,8 @@
 #define MAX_CLUSTER_SIZE 64
 #define FIRST_CLUSTER(x, y)  ((x << 16) | y)    // calculate the file first cluster
 #define MAX_NUM_CLUSTERS 0x0FF4
+#define LONG_ENTRY_MASK 0x40                    // mask for long names
+#define LAST_LONG_ENTRY(x) (LONG_ENTRY_MASK | x)    // the n-th entry of long name
 
 
 struct disk_t* disk_open_from_file(const char* volume_file_name){
@@ -938,3 +940,20 @@ int dir_close(struct dir_t* pdir){
     free(pdir);
     return 0;
 }
+
+/*
+
+Key points:
+
+- exactly before short name record (contigous) in reverse order
+- first byte stores order value of long directory name entry masked with 0x40, starts from 1
+- 5 characters
+
+- byte set to zero
+- checkum from short file name (last if record)
+- 6 characters
+- 2 bytes set to zero
+- 2 characters
+=====================================
+
+*/

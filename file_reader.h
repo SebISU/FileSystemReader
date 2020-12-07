@@ -118,7 +118,7 @@ struct file_t{
     uint32_t size;
     uint16_t first_cluster;
     uint16_t actual_cluster;
-    char name[13];  // could be uint8_t* but small problem with using strcmp() :)
+    char name[256];  // could be uint8_t* but small problem with using strcmp() :)
 
 } __attribute__((__packed__));
 
@@ -141,7 +141,7 @@ struct dir_entry_t{
 
     uint32_t size;
     uint32_t first_cluster;
-    char name[13];
+    char name[256];
     uint8_t is_archived : 1;
     uint8_t is_readonly : 1;
     uint8_t is_system : 1;
