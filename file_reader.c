@@ -267,7 +267,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
                 value <<= 8;
                 value |= *(fats_data + i);
 
-                if (value == 0x0fff){
+                if (value == 0x0fff || value == 0x0ff8){
                     *(volumin->clusters_indexes + index) = LAST_CLUSTER;
                 }
                 else{
@@ -354,7 +354,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
     if (last_bslash == 0 && file_name[0] != '\\'){
 
-        strcpy(temp_path, "\\");    //check if NULL at the end 
+        strcpy(temp_path, "\\");
         temp_path[last_bslash + 1] = '\0';
     }
     else{
@@ -362,8 +362,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         temp_path[last_bslash + 1] = '\0';
     }
 
-    struct dir_t * final_dir = dir_open(pvolume, temp_path);    // here problem
-
+    struct dir_t * final_dir = dir_open(pvolume, temp_path);
     free(temp_path);
 
     if (final_dir == NULL){
@@ -378,6 +377,10 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
         free(final_dir);
         errno = ENOMEM;
         return NULL;
+    }
+
+    if (last_bslash > 0){
+        last_bslash += 1;
     }
 
     struct dir_entry_t dir_file;
@@ -421,68 +424,6 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
     
     return final_file;
 }
-
-
-//     struct SFN * root_dir = calloc(pvolume->num_of_files_root_dir, sizeof(struct SFN));
-
-//     if (root_dir == NULL){
-
-//         errno = ENOMEM;
-//         return NULL;
-//     }
-
-//     if (-1 == disk_read(pvolume->disk, pvolume->bef_data_size - pvolume->root_dir_size, root_dir, pvolume->root_dir_size)){
-
-//         free(root_dir);
-//         return NULL;
-//     }
-
-//     struct file_t * file = calloc(1, sizeof(struct file_t));
-
-//     if (file == NULL){
-
-//         free(root_dir);
-//         errno = ENOMEM;
-//         return NULL;
-//     }
-
-//     for (uint32_t i = 0; i < pvolume->num_of_files_root_dir; ++i){
-
-//         if (*((uint8_t*)(root_dir + i)) == UNALLOCATED || *((uint8_t*)(root_dir + i)) == DELETED){
-//             continue;
-//         }
-
-//         convert_record_name((root_dir + i)->filename, (root_dir + i)->ext, file->name);
-        
-//         if (0 == own_strcmp(file_name, (const char*)file->name)){
-
-//             if ((root_dir + i)->file_attributes.volume_label || (root_dir + i)->file_attributes.directory){
-
-//                 free(root_dir);
-//                 free(file);
-//                 errno = EISDIR;
-//                 return NULL;
-//             }
-
-//             file->volumin = pvolume;
-//             file->offset = 0;
-//             file->size = (root_dir + i)->size;
-//             file->first_cluster = FIRST_CLUSTER((root_dir + i)->high_order_address_of_first_cluster, (root_dir + i)->low_order_address_of_first_cluster);
-//             file->actual_cluster = file->first_cluster;
-
-//             free(root_dir);
-//             return file;
-//         }
-//         else{
-//             continue;
-//         }
-//     }
-
-//     free(root_dir);
-//     free(file);
-//     errno = ENOENT;
-//     return NULL;
-// }
 
 int own_strcmp(const char * file_name1, const char * file_name2){
 
@@ -564,6 +505,9 @@ int file_close(struct file_t* stream){
     return 0;
 }
 
+// directory contains records that describe . and .. so you do not have to use continue in while loop
+
+
 size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
     if (stream == NULL){
@@ -573,7 +517,6 @@ size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
     }
 
     if (stream->offset == stream->size || ptr == NULL){
-
         return 0;
     }
 
@@ -749,7 +692,6 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     strcpy(dir_path_copy, dir_path);
     dir_path_copy[strlen(dir_path)] = '\0';
-
     int32_t flag = 0;
     char * filename = strtok(dir_path_copy, "\\");
 
@@ -757,6 +699,8 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
         if (strcmp(filename, ".") == 0){
 
+            dir->index_record = 0;
+            filename = strtok(NULL, "\\");
             continue;
         }
 
@@ -767,13 +711,14 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
             if (search_path == NULL){
 
-                //dir_tree_free(search_path);
                 free(dir_path_copy);
                 errno = ENOENT; // good?
                 return NULL;
             }
 
+            filename = strtok(NULL, "\\");
             dir = dir_tree_pop(&search_path);
+            dir->index_record = 0;
             continue;
         }
 
@@ -783,8 +728,6 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
             if (own_strcmp(file_info.name, filename) == 0){
 
-                printf("file: %s\n", filename);
-                printf("file ss: %s\n", file_info.name);
                 if (file_info.is_directory == 0){
 
                     dir_tree_free(&search_path);
@@ -793,7 +736,23 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
                     return NULL;
                 }
 
-                dir = dir_tree_push(&search_path, file_info.size);
+                temp_file.offset = 0;
+                temp_file.volumin = pvolume;
+                temp_file.first_cluster = file_info.first_cluster;
+                temp_file.actual_cluster = file_info.first_cluster;
+                strcpy(temp_file.name, file_info.name);
+
+                temp_file.size = pvolume->cluster_size * pvolume->bytes_per_sector;
+                
+                while (pvolume->clusters_indexes[temp_file.actual_cluster] != LAST_CLUSTER){
+
+                    temp_file.size += pvolume->cluster_size * pvolume->bytes_per_sector;
+                    temp_file.actual_cluster = pvolume->clusters_indexes[temp_file.actual_cluster];
+                }
+
+                temp_file.actual_cluster = temp_file.first_cluster;
+
+                dir = dir_tree_push(&search_path, temp_file.size);
 
                 if (dir == NULL){
 
@@ -803,25 +762,16 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
                     return NULL;
                 }
 
-                temp_file.offset = 0;
-                temp_file.volumin = pvolume;
-                temp_file.size = file_info.size;
-                temp_file.first_cluster = file_info.first_cluster;
-                temp_file.actual_cluster = file_info.first_cluster;
-                strcpy(temp_file.name, file_info.name);
-
-
-                if (file_read(dir->current_dir, file_info.size, 1, &temp_file) <= 0){
+                if (file_read(dir->current_dir, temp_file.size, 1, &temp_file) <= 0){
 
                     dir_tree_free(&search_path);
                     free(dir_path_copy);
                     return NULL;
                 }
                 else{
-
+                
                     dir->index_record = 0;
-                    dir->num_of_records = file_info.size / sizeof(struct SFN);
-
+                    dir->num_of_records = temp_file.size / sizeof(struct SFN);
                     break;
                 }
             }
@@ -903,7 +853,7 @@ struct dir_t * dir_tree_push(struct dir_t_node ** head, uint32_t dir_size){
 
 struct dir_t * dir_tree_pop(struct dir_t_node ** head){
 
-    if (head == NULL || *head == NULL || (*head)->dir == NULL){ // not sure if head_dir needed
+    if (head == NULL || *head == NULL || (*head)->dir == NULL){
 
         return NULL;
     }
@@ -968,7 +918,7 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
             pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
             pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
             pdir->index_record++;
-
+            
             return 0;
         }
     }
