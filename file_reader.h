@@ -88,6 +88,19 @@ struct SFN{
     uint32_t size;
 } __attribute__((__packed__));
 
+struct LFN{
+
+    uint8_t order;
+    uint16_t first_data[5];
+    union file_attrs entry_attributes;
+    uint8_t type;
+    uint8_t checksum;
+    uint16_t second_data[6];
+    uint16_t type2;
+    uint16_t third_data[2];
+
+} __attribute__((__packed__));
+
 struct disk_t{
     FILE * file;
     uint32_t many_sectors;
@@ -118,7 +131,7 @@ struct file_t{
     uint32_t size;
     uint16_t first_cluster;
     uint16_t actual_cluster;
-    char name[256];  // could be uint8_t* but small problem with using strcmp() :)
+    char name[256];
 
 } __attribute__((__packed__));
 
@@ -141,7 +154,7 @@ struct dir_entry_t{
 
     uint32_t size;
     uint32_t first_cluster;
-    char name[256];
+    char name[256];         // if you want to use unsigned char, need to refacor code (func. parameters etc.)
     uint8_t is_archived : 1;
     uint8_t is_readonly : 1;
     uint8_t is_system : 1;
@@ -164,5 +177,6 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry);
 int dir_close(struct dir_t* pdir);
 int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * name);
 int own_strcmp(const char * file_name1, const char * file_name2);
+unsigned char check_sum(char *pFcbName);
 
 #endif

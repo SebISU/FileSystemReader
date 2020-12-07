@@ -8,8 +8,6 @@
 #include "file_reader.h"
 #define UNALLOCATED 0x00
 #define DELETED 0xe5
-#define FILE_NAME 8
-#define FILE_EXT 3
 #define SECTOR_SIZE 512
 #define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, author of the task suggests 0x55AA BIG vs. LITTLE endian?
 #define LAST_CLUSTER 0xFFFF
@@ -18,7 +16,9 @@
 #define FIRST_CLUSTER(x, y)  ((x << 16) | y)    // calculate the file first cluster
 #define MAX_NUM_CLUSTERS 0x0FF4
 #define LONG_ENTRY_MASK 0x40                    // mask for long names
-#define LAST_LONG_ENTRY(x) (LONG_ENTRY_MASK | x)    // the n-th entry of long name
+//#define LAST_LONG_ENTRY(x) (LONG_ENTRY_MASK | x)    // create a mask with number of entry of long name
+#define LONG_ENTRY_NUM(x) (LONG_ENTRY_MASK ^ x)    // the number of entry of long name
+#define IS_LONG_ENTRY 0x0F
 
 
 struct disk_t* disk_open_from_file(const char* volume_file_name){
@@ -473,7 +473,7 @@ int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * na
     }
 
         int32_t j;
-        for (j = 0; j < FILE_NAME; j++){
+        for (j = 0; j < 8; j++){
 
             if (filename[j] == ' '){
                 break;
@@ -485,7 +485,7 @@ int convert_record_name(const uint8_t * filename, const uint8_t * ext, char * na
         name[j] = '.';
 
         int32_t k;
-        for (k = 0; k < FILE_EXT; k++){
+        for (k = 0; k < 3; k++){
 
             if (ext[k] == ' '){
                 break;
@@ -909,19 +909,139 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
 
     for (; pdir->index_record < pdir->num_of_records; pdir->index_record++){
 
-        if (*((uint8_t*)(pdir->current_dir + pdir->index_record)) != UNALLOCATED && *((uint8_t*)(pdir->current_dir + pdir->index_record)) != DELETED && !(pdir->current_dir + pdir->index_record)->file_attributes.volume_label){
+        if (*((uint8_t*)(pdir->current_dir + pdir->index_record)) != UNALLOCATED && *((uint8_t*)(pdir->current_dir + pdir->index_record)) != DELETED){
             
-            convert_record_name((pdir->current_dir + pdir->index_record)->filename, (pdir->current_dir + pdir->index_record)->ext, pentry->name);
-            pentry->size = (pdir->current_dir + pdir->index_record)->size;
-            pentry->is_archived = (pdir->current_dir + pdir->index_record)->file_attributes.archive;
-            pentry->is_readonly = (pdir->current_dir + pdir->index_record)->file_attributes.read_only;
-            pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
-            pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
-            pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
-            pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
-            pdir->index_record++;
+            if (((pdir->current_dir + pdir->index_record)->file_attributes.file_attributes & IS_LONG_ENTRY) == IS_LONG_ENTRY && *((uint8_t*)(pdir->current_dir + pdir->index_record)) > LONG_ENTRY_MASK){
 
-            return 0;
+                uint32_t ln_size = LONG_ENTRY_NUM(*((uint8_t*)(pdir->current_dir + pdir->index_record)));
+                uint32_t iter;
+                uint8_t checksum;
+
+                for (iter = 0; iter < ln_size; iter++){
+
+                    if (iter > 0){
+
+                        if (*((uint8_t*)(pdir->current_dir + pdir->index_record)) != ln_size - iter){
+
+                            break;
+                        }
+                    }
+
+                    if (((struct LFN *)(pdir->current_dir + pdir->index_record))->type != 0 || ((struct LFN *)(pdir->current_dir + pdir->index_record))->type2 != 0 || ((pdir->current_dir + pdir->index_record)->file_attributes.file_attributes & IS_LONG_ENTRY) != IS_LONG_ENTRY){
+
+                        break;
+                    }
+
+                    pdir->index_record++;
+                }
+
+                if (iter != ln_size){
+
+                    break;
+                }
+
+                // check if file_attributes in SFN can be 0 
+
+                pentry->size = (pdir->current_dir + pdir->index_record)->size;
+                pentry->is_archived = (pdir->current_dir + pdir->index_record)->file_attributes.archive;
+                pentry->is_readonly = (pdir->current_dir + pdir->index_record)->file_attributes.read_only;
+                pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
+                pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
+                pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
+                pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
+                convert_record_name((pdir->current_dir + pdir->index_record)->filename, (pdir->current_dir + pdir->index_record)->ext, pentry->name);
+
+                checksum = check_sum(pentry->name);
+                uint32_t j;
+                uint8_t flag = 0;
+
+                // maybe increasing for loop does not required. Look for SFN and go back until you meet 0x40 mask. Easier, but how to know that it is a long name
+
+                for (iter = 1; iter <= ln_size; iter++){
+
+                    if (((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->checksum != checksum){
+
+                        break;
+                    }
+
+                    for (j = 0; j < 5; j++){
+
+                        if (flag == 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->first_data[j] != 0xFFFF){
+
+                            flag = 2;
+                            break;
+                        }
+
+                        if (flag != 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->first_data[j] == 0){
+
+                            flag = 1;
+                        }
+
+                        pentry->name[(iter - 1)* 13 + j] = ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->first_data[j];
+                    }
+
+                    if (flag < 2){
+
+                        for (j = 0; j < 6; j++){
+                        
+                            if (flag == 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->second_data[j] != 0xFFFF){
+
+                                flag = 2;
+                                break;
+                            }
+
+                            if (flag != 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->second_data[j] == 0){
+
+                                flag = 1;
+                            }
+
+                            pentry->name[(iter - 1)* 13 + 5 + j] = ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->second_data[j];
+                        }
+                    }
+
+                    if (flag < 2){
+                    
+                    for (j = 0; j < 2; j++){
+
+                            if (flag == 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->third_data[j] != 0xFFFF){
+
+                                break;
+                            }
+
+                            if (flag != 1 && ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->third_data[j] == 0){
+
+                                flag = 1;
+                            }
+
+                            pentry->name[(iter - 1)* 13 + 11 + j] = ((struct LFN *)(pdir->current_dir + pdir->index_record - iter))->third_data[j];
+                        }
+                    }
+                }
+
+                if(iter == ln_size + 1){
+
+                    pentry->name[13*ln_size] = '\0';        //maybe index out of range
+                    pdir->index_record++;
+                
+                    return 0;
+                }
+
+                pdir->index_record++; // maybe wrong, depends on implementation, have to check this
+            }
+            else if (!(pdir->current_dir + pdir->index_record)->file_attributes.volume_label){
+
+                convert_record_name((pdir->current_dir + pdir->index_record)->filename, (pdir->current_dir + pdir->index_record)->ext, pentry->name);
+                pentry->size = (pdir->current_dir + pdir->index_record)->size;
+                pentry->is_archived = (pdir->current_dir + pdir->index_record)->file_attributes.archive;
+                pentry->is_readonly = (pdir->current_dir + pdir->index_record)->file_attributes.read_only;
+                pentry->is_system = (pdir->current_dir + pdir->index_record)->file_attributes.system_file;
+                pentry->is_hidden = (pdir->current_dir + pdir->index_record)->file_attributes.hidden_file;
+                pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
+                pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
+                pdir->index_record++;
+
+                return 0;
+            }
         }
     }
 
@@ -941,19 +1061,35 @@ int dir_close(struct dir_t* pdir){
     return 0;
 }
 
+unsigned char check_sum(char *pFcbName){
+
+    short FcbNameLen;
+    unsigned char sum;
+    sum = 0;
+    for (FcbNameLen=11; FcbNameLen != 0; FcbNameLen--){
+    
+        sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *pFcbName++;
+    }
+
+    return sum;
+} 
+
+
 /*
 
 Key points:
 
 - exactly before short name record (contigous) in reverse order
-- first byte stores order value of long directory name entry masked with 0x40, starts from 1
+- first byte stores order value of long directory name entry (first entry/end of name masked with 0x40), starts from 1
 - 5 characters
 
 - byte set to zero
-- checkum from short file name (last if record)
+- checkum from short file name (last in long record)
 - 6 characters
 - 2 bytes set to zero
 - 2 characters
 =====================================
 
+- copy all character fields and put 0x00 at the end in case the name is max length
+- attributes should be set to 0x0F
 */
