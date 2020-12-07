@@ -3,19 +3,19 @@
 # Tomasz Jaworski, 2018-2020
 #
 # Plik wygenerowany automatycznie
-# Znacznik czasowy: 2020-12-05 14:22:27.817029
+# Znacznik czasowy: 2020-12-07 11:46:44.450806
 #
 
 OUTDIR		:= build-dir
 
 CC          := gcc
-CC_FLAGS    := -xc -Werror=vla -Wno-error=implicit-fallthrough -Wno-error=unused-parameter -Wextra -ggdb3 -fmax-errors=5 -std=c11 -Wno-parentheses -D_ANSI_OUTPUT -pedantic -Wno-error=parentheses -DINSIDE_DANTE -fdiagnostics-color -D_GNU_SOURCE -Werror -Wall 
+CC_FLAGS    := -std=c11 -D_GNU_SOURCE -Wall -Wno-parentheses -fmax-errors=5 -Wno-error=unused-parameter -Wextra -DINSIDE_DANTE -ggdb3 -Wno-error=implicit-fallthrough -D_ANSI_OUTPUT -Werror -xc -pedantic -Werror=vla -fdiagnostics-color -Wno-error=parentheses 
 #CC_FLAGS    += -Werror=vla -Wno-error=unused-parameter -Wno-error=parentheses -Wno-parentheses -Wno-error=implicit-fallthrough
 #CC_FLAGS    += -D_GNU_SOURCE -D_TEST_BOOTSTRAP -DINSIDE_DANTE
 #CC_FLAGS    += -D_NO_HTML_OUTPUT -D_ANSI_OUTPUT
 
 LD          := gcc
-LD_FLAGS    := -Wl,-cref -ggdb3 -Wl,-Map=main.map -Wl,-wrap,main 
+LD_FLAGS    := -ggdb3 -Wl,-Map=main.map -Wl,-cref -Wl,-wrap,main 
 LD_LIBS     := -lm 
 
 RM          := rm -rf

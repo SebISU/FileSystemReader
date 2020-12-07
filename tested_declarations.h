@@ -1,7 +1,7 @@
 /*
  * Test dla zadania Projekt: ścieżki bezwzględne, wielkości liter (4,0)
  * Autor testowanej odpowiedzi: Sebastian Derendarz
- * Test wygenerowano automatycznie o 2020-12-05 14:22:19.187143
+ * Test wygenerowano automatycznie o 2020-12-07 11:46:32.837033
  *
  * Debug: { { test|pprint } }
  */

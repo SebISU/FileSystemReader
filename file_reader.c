@@ -12,10 +12,11 @@
 #define FILE_EXT 3
 #define SECTOR_SIZE 512
 #define VOLUMIN_SIGNATURE 0xAA55 // Value from resources, author of the task suggests 0x55AA BIG vs. LITTLE endian?
-#define LAST_CLUSTER 0xffff
+#define LAST_CLUSTER 0xFFFF
 #define POWER_OF_TWO(x) ((x & (x - 1)) && x)    // check if value is a power of two
 #define MAX_CLUSTER_SIZE 64
 #define FIRST_CLUSTER(x, y)  ((x << 16) | y)    // calculate the file first cluster
+#define MAX_NUM_CLUSTERS 0x0FF4
 
 
 struct disk_t* disk_open_from_file(const char* volume_file_name){
@@ -77,7 +78,6 @@ int disk_close(struct disk_t* pdisk){
 
     fclose(pdisk->file);
     free(pdisk);
-    pdisk = NULL;
 
     return 0;
 }
@@ -280,7 +280,7 @@ struct volume_t* fat_open(struct disk_t* pdisk, uint32_t first_sector){
                 value = *(fats_data + i) << 4;
                 value |= (*(fats_data + i - 1) >> 4);
 
-                if (value == 0x0fff){
+                if (value == 0x0fff|| value == 0x0ff8){
                     *(volumin->clusters_indexes + index) = LAST_CLUSTER;
                 }
                 else{
@@ -374,6 +374,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
     if  (final_file == NULL){
 
+        free(final_dir->current_dir);
         free(final_dir);
         errno = ENOMEM;
         return NULL;
@@ -391,6 +392,7 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
             if (dir_file.is_directory == 1){
 
+                free(final_dir->current_dir);
                 free(final_dir);
                 free(final_file);
                 errno = EISDIR;
@@ -412,14 +414,21 @@ struct file_t* file_open(struct volume_t* pvolume, const char* file_name){
 
     if (flag == 1){
 
+        free(final_dir->current_dir);
+        free(final_dir);
+        free(final_file);
         errno = ENOENT;
         return NULL;
     }
     else if (flag == -1){
 
+        free(final_dir->current_dir);
+        free(final_dir);
+        free(final_file);
         return NULL;
     }
 
+    free(final_dir->current_dir);
     free(final_dir);
     
     return final_file;
@@ -505,18 +514,15 @@ int file_close(struct file_t* stream){
     return 0;
 }
 
-// directory contains records that describe . and .. so you do not have to use continue in while loop
-
-
 size_t file_read(void *ptr, size_t size, size_t nmemb, struct file_t *stream){
 
-    if (stream == NULL){
+    if (stream == NULL || ptr == NULL){
 
         errno = EFAULT;
         return -1;
     }
 
-    if (stream->offset == stream->size || ptr == NULL){
+    if (stream->offset == stream->size){
         return 0;
     }
 
@@ -666,8 +672,7 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     struct dir_entry_t file_info;
     struct file_t temp_file;
-    struct dir_t_node * search_path = NULL; 
-    struct dir_t * dir = dir_tree_push(&search_path, pvolume->num_of_files_root_dir * sizeof(struct SFN));
+    struct dir_t * dir = calloc(1, sizeof(struct dir_t));
 
     if (dir == NULL){
 
@@ -675,9 +680,26 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
         return NULL;
     }
 
+    dir->current_dir = calloc(1, pvolume->num_of_files_root_dir * sizeof(struct SFN));
+
+    if (dir->current_dir == NULL){
+
+        free(dir);
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    dir->index_record = 0;
+    dir->num_of_records = pvolume->num_of_files_root_dir;
+
     if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, dir->current_dir, pvolume->root_dir_size)){
 
-        dir_tree_free(&search_path);
+        if (dir->current_dir != NULL){
+            
+            free(dir->current_dir);
+        }
+
+        free(dir);
         return NULL;
     }
 
@@ -685,7 +707,12 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
     if (dir_path_copy == NULL){
 
-        dir_tree_free(&search_path);
+        if (dir->current_dir != NULL){
+            
+            free(dir->current_dir);
+        }
+
+        free(dir);
         errno = ENOMEM;
         return NULL;
     }
@@ -693,34 +720,10 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
     strcpy(dir_path_copy, dir_path);
     dir_path_copy[strlen(dir_path)] = '\0';
     int32_t flag = 0;
+    struct SFN * temp_dir;
     char * filename = strtok(dir_path_copy, "\\");
 
     while(filename != NULL){
-
-        if (strcmp(filename, ".") == 0){
-
-            dir->index_record = 0;
-            filename = strtok(NULL, "\\");
-            continue;
-        }
-
-        if (strcmp(filename, "..") == 0){
-
-            dir = dir_tree_pop(&search_path);
-            free(dir);
-
-            if (search_path == NULL){
-
-                free(dir_path_copy);
-                errno = ENOENT; // good?
-                return NULL;
-            }
-
-            filename = strtok(NULL, "\\");
-            dir = dir_tree_pop(&search_path);
-            dir->index_record = 0;
-            continue;
-        }
 
         flag = dir_read(dir, &file_info);
 
@@ -730,7 +733,12 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
                 if (file_info.is_directory == 0){
 
-                    dir_tree_free(&search_path);
+                    if (dir->current_dir != NULL){
+                        
+                        free(dir->current_dir);
+                    }
+
+                    free(dir);
                     free(dir_path_copy);
                     errno = ENOTDIR;
                     return NULL;
@@ -742,37 +750,107 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
                 temp_file.actual_cluster = file_info.first_cluster;
                 strcpy(temp_file.name, file_info.name);
 
-                temp_file.size = pvolume->cluster_size * pvolume->bytes_per_sector;
-                
-                while (pvolume->clusters_indexes[temp_file.actual_cluster] != LAST_CLUSTER){
+                if (temp_file.actual_cluster == 0){
 
-                    temp_file.size += pvolume->cluster_size * pvolume->bytes_per_sector;
-                    temp_file.actual_cluster = pvolume->clusters_indexes[temp_file.actual_cluster];
-                }
+                    temp_file.size = pvolume->root_dir_size * pvolume->bytes_per_sector;
 
-                temp_file.actual_cluster = temp_file.first_cluster;
+                    temp_dir = realloc(dir->current_dir, pvolume->root_dir_size * pvolume->bytes_per_sector);
 
-                dir = dir_tree_push(&search_path, temp_file.size);
+                    if (temp_dir == NULL){
 
-                if (dir == NULL){
+                        if (dir->current_dir != NULL){
+                            
+                            free(dir->current_dir);
+                        }
 
-                    dir_tree_free(&search_path);
-                    free(dir_path_copy);
-                    errno = ENOMEM;
-                    return NULL;
-                }
+                        free(dir);
+                        free(dir_path_copy);
+                        errno = ENOMEM;
+                        return NULL;
+                    }
 
-                if (file_read(dir->current_dir, temp_file.size, 1, &temp_file) <= 0){
+                    if (temp_dir != dir->current_dir && dir->current_dir != NULL){
 
-                    dir_tree_free(&search_path);
-                    free(dir_path_copy);
-                    return NULL;
+                        free(dir->current_dir);
+                    }
+
+                    dir->current_dir = temp_dir;
+
+                    if (-1 == disk_read(pvolume->disk, pvolume->boot_size + pvolume->sects_per_fat * pvolume->num_of_fats, dir->current_dir, pvolume->root_dir_size)){
+
+                        if (dir->current_dir != NULL){
+                            
+                            free(dir->current_dir);
+                        }
+
+                        free(dir);
+                        free(dir_path_copy);
+                        return NULL;
+                    }
+                    else{
+                    
+                        dir->index_record = 0;
+                        dir->num_of_records = temp_file.size / sizeof(struct SFN);
+                        break;
+                    }
+
                 }
                 else{
-                
-                    dir->index_record = 0;
-                    dir->num_of_records = temp_file.size / sizeof(struct SFN);
-                    break;
+
+                    temp_file.size = pvolume->cluster_size * pvolume->bytes_per_sector;
+
+                    while (pvolume->clusters_indexes[temp_file.actual_cluster] != LAST_CLUSTER){
+
+                        temp_file.size += pvolume->cluster_size * pvolume->bytes_per_sector;
+
+                        if (pvolume->clusters_indexes[temp_file.actual_cluster] > MAX_NUM_CLUSTERS || pvolume->clusters_indexes[temp_file.actual_cluster] == 0){
+                            break;
+                        }
+
+                        temp_file.actual_cluster = pvolume->clusters_indexes[temp_file.actual_cluster];
+                    }
+
+                    temp_file.actual_cluster = temp_file.first_cluster;
+
+                    temp_dir = realloc(dir->current_dir, temp_file.size);
+
+                    if (temp_dir == NULL){
+
+                        if (dir->current_dir != NULL){
+                            
+                            free(dir->current_dir);
+                        }
+
+                        free(dir);
+                        free(dir_path_copy);
+                        errno = ENOMEM;
+                        return NULL;
+                    }
+
+                    if (temp_dir != dir->current_dir && dir->current_dir != NULL){
+
+                        free(dir->current_dir);
+                    }
+
+                    dir->current_dir = temp_dir;
+
+                    if (file_read(dir->current_dir, temp_file.size, 1, &temp_file) == 0){
+
+                        if (dir->current_dir != NULL){
+                            
+                            free(dir->current_dir);
+                        }
+
+                        free(dir);
+                        free(dir_path_copy);
+                        return NULL;
+                    }
+                    else{
+                    
+                        dir->index_record = 0;
+                        dir->num_of_records = temp_file.size / sizeof(struct SFN);
+                        break;
+                    }
                 }
             }
 
@@ -781,15 +859,23 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
 
         if (flag == 1){
 
-            dir_tree_free(&search_path);
+            if (dir->current_dir != NULL){
+                
+                free(dir->current_dir);
+            }
+            free(dir);
             free(dir_path_copy);
             errno = ENOENT;
             return NULL;
         }
         else if (flag == -1){
 
+            if (dir->current_dir != NULL){
+                
+                free(dir->current_dir);
+            }
+            free(dir);
             free(dir_path_copy);
-            dir_tree_free(&search_path);
             return NULL;
         }
 
@@ -797,94 +883,8 @@ struct dir_t* dir_open(struct volume_t* pvolume, const char* dir_path){
     }
 
     free(dir_path_copy);
-    dir = dir_tree_pop(&search_path);
-    dir_tree_free(&search_path);
 
     return dir;
-}
-
-struct dir_t * dir_tree_push(struct dir_t_node ** head, uint32_t dir_size){
-
-    if (head == NULL){
-
-        return NULL;
-    }
-
-    struct dir_t_node * new_dir_node = calloc(1, sizeof(struct dir_t_node));
-
-    if (new_dir_node == NULL){
-
-        return NULL;
-    }
-
-    new_dir_node->dir = calloc(1, sizeof(struct dir_t));
-
-    if (new_dir_node->dir == NULL){
-
-        free(new_dir_node);
-        return NULL;
-    }
-
-    new_dir_node->dir->current_dir = calloc(1, dir_size);
-
-    if (new_dir_node->dir->current_dir == NULL){
-
-        free(new_dir_node->dir);
-        free(new_dir_node);
-        return NULL;
-    }
-
-    new_dir_node->dir->index_record = 0;
-    new_dir_node->dir->num_of_records = dir_size / sizeof(struct SFN);
-
-    if (*head == NULL){
-
-        new_dir_node->prev_dir = NULL;
-    }
-    else{
-
-        new_dir_node->prev_dir = *head;
-    }
-
-    *head = new_dir_node;
-
-    return (*head)->dir;
-}
-
-struct dir_t * dir_tree_pop(struct dir_t_node ** head){
-
-    if (head == NULL || *head == NULL || (*head)->dir == NULL){
-
-        return NULL;
-    }
-
-    struct dir_t * actual = (*head)->dir;
-    struct dir_t_node * now_head = *head;
-    *head = (*head)->prev_dir;
-    free(now_head);
-    
-    return actual;
-}
-
-int dir_tree_free(struct dir_t_node ** head){
-
-    if (head == NULL || *head == NULL){
-
-        return 1;
-    }
-
-    struct dir_t_node * actual_node;
-
-    while(*head != NULL){
-
-        free((*head)->dir->current_dir);
-        free((*head)->dir);
-        actual_node = *head;
-        *head = (*head)->prev_dir;
-        free(actual_node);
-    }
-
-    return 0;
 }
 
 int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
@@ -918,7 +918,7 @@ int dir_read(struct dir_t* pdir, struct dir_entry_t* pentry){
             pentry->is_directory = (pdir->current_dir + pdir->index_record)->file_attributes.directory;
             pentry->first_cluster = FIRST_CLUSTER((pdir->current_dir + pdir->index_record)->high_order_address_of_first_cluster, (pdir->current_dir + pdir->index_record)->low_order_address_of_first_cluster);
             pdir->index_record++;
-            
+
             return 0;
         }
     }
