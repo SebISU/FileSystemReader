@@ -20,6 +20,7 @@
 #define LONG_ENTRY_NUM(x) (LONG_ENTRY_MASK ^ x)    // the number of entry of long name
 #define IS_LONG_ENTRY 0x0F
 
+// to create a real path from relative path in c one can use realpath() function
 
 struct disk_t* disk_open_from_file(const char* volume_file_name){
 
