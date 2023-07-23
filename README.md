@@ -1,3 +1,3 @@
 # file-system-reader
 
-Own funcs for reading FAT12/16.
+Set of functions written in C for reading FAT12/16.
